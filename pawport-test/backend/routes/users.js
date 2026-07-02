@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const appConfig = require('../../config/app.config');
 const { User, Con, UserCon, Hotel, UserConHotel } = require('../database/init');
 const { authenticate, optionalAuth } = require('../middleware/auth');
+const { shouldIncludeTestData } = require('../utils/testData');
 
 function compareVisitsByConDate(a, b) {
   const aTime = new Date(a.Con?.start_date || 0).getTime();
@@ -12,15 +13,32 @@ function compareVisitsByConDate(a, b) {
   return (a.visit_order || 0) - (b.visit_order || 0);
 }
 
+function visibleUserWhere(req) {
+  const where = { show_on_homepage: true };
+  if (!shouldIncludeTestData(req, appConfig.features.showTestUsers)) {
+    where.is_test = false;
+  }
+  return where;
+}
+
+function visibleConWhere(req) {
+  if (shouldIncludeTestData(req, appConfig.features.showTestCons)) {
+    return {};
+  }
+  return { is_test: false };
+}
+
+function visibleHotelWhere(req) {
+  if (shouldIncludeTestData(req, true)) {
+    return {};
+  }
+  return { is_test: false };
+}
+
 // GET /api/users - List visible users (for homepage)
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const where = { show_on_homepage: true };
-    
-    // Filter out test users if disabled
-    if (!appConfig.features.showTestUsers) {
-      where.is_test = false;
-    }
+    const where = visibleUserWhere(req);
 
     const users = await User.findAll({
       where,
@@ -30,7 +48,7 @@ router.get('/', optionalAuth, async (req, res) => {
         include: [{
           model: Con,
           attributes: ['id', 'name', 'latitude', 'longitude', 'start_date', 'end_date', 'city'],
-          where: appConfig.features.showTestCons ? {} : { is_test: false },
+          where: visibleConWhere(req),
           required: false,
         }],
         attributes: ['id', 'con_id', 'comment', 'rating', 'visit_order'],
@@ -53,7 +71,11 @@ router.get('/', optionalAuth, async (req, res) => {
 // GET /api/users/:id - Get user profile with con history
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
-    const user = await User.findByPk(req.params.id, {
+    const user = await User.findOne({
+      where: {
+        id: req.params.id,
+        ...visibleUserWhere(req),
+      },
       attributes: { exclude: ['password_hash', 'google_id', 'wechat_id', 'qq_id'] },
       include: [{
         model: UserCon,
@@ -64,11 +86,15 @@ router.get('/:id', optionalAuth, async (req, res) => {
               'id', 'name', 'name_en', 'start_date', 'end_date', 'venue', 'address',
               'city', 'country', 'latitude', 'longitude', 'avatar_url', 'theme_color',
             ],
+            where: visibleConWhere(req),
+            required: false,
           },
           {
             model: Hotel,
             through: { attributes: ['check_in', 'check_out', 'notes'] },
             attributes: ['id', 'name', 'address', 'city', 'country', 'latitude', 'longitude'],
+            where: visibleHotelWhere(req),
+            required: false,
           },
         ],
         attributes: ['id', 'con_id', 'comment', 'rating', 'visit_order', 'extra_fields'],
@@ -91,7 +117,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
     };
 
     if (user.show_con_history || isOwner) {
-      response.cons = user.UserCons ? [...user.UserCons].sort(compareVisitsByConDate) : [];
+      response.cons = user.UserCons
+        ? [...user.UserCons].filter(uc => uc.Con).sort(compareVisitsByConDate)
+        : [];
     }
 
     if (!user.show_hotel_info && !isOwner) {
@@ -115,7 +143,11 @@ router.get('/:id', optionalAuth, async (req, res) => {
 // GET /api/users/:id/trajectory - Get user's con trajectory for map
 router.get('/:id/trajectory', async (req, res) => {
   try {
-    const user = await User.findByPk(req.params.id, {
+    const user = await User.findOne({
+      where: {
+        id: req.params.id,
+        ...visibleUserWhere(req),
+      },
       attributes: ['id', 'username', 'theme_color', 'show_on_homepage', 'show_con_history'],
     });
 
@@ -128,7 +160,7 @@ router.get('/:id/trajectory', async (req, res) => {
       include: [{
         model: Con,
         attributes: ['id', 'name', 'latitude', 'longitude', 'start_date'],
-        where: appConfig.features.showTestCons ? {} : { is_test: false },
+        where: visibleConWhere(req),
       }],
     });
 

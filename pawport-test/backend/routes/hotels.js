@@ -3,12 +3,21 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const { Hotel } = require('../database/init');
 const { authenticate } = require('../middleware/auth');
+const { shouldIncludeTestData } = require('../utils/testData');
+
+function visibleHotelWhere(req) {
+  const where = {};
+  if (!shouldIncludeTestData(req, true)) {
+    where.is_test = false;
+  }
+  return where;
+}
 
 // GET /api/hotels - Search hotels
 router.get('/', async (req, res) => {
   try {
     const { search, city } = req.query;
-    const where = {};
+    const where = visibleHotelWhere(req);
 
     if (search) {
       where.name = { [Op.like]: `%${search}%` };
@@ -53,7 +62,12 @@ router.post('/', authenticate, async (req, res) => {
 // GET /api/hotels/:id
 router.get('/:id', async (req, res) => {
   try {
-    const hotel = await Hotel.findByPk(req.params.id);
+    const hotel = await Hotel.findOne({
+      where: {
+        id: req.params.id,
+        ...visibleHotelWhere(req),
+      },
+    });
     if (!hotel) {
       return res.status(404).json({ error: 'Hotel not found' });
     }

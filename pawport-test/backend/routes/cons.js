@@ -8,6 +8,7 @@ const { body, validationResult } = require('express-validator');
 const appConfig = require('../../config/app.config');
 const { Con, User, UserCon, Hotel, UserConHotel } = require('../database/init');
 const { authenticate, optionalAuth, requireAdmin } = require('../middleware/auth');
+const { shouldIncludeTestData } = require('../utils/testData');
 
 const conAvatarDir = path.join(__dirname, '..', 'uploads', 'avatars', 'cons');
 fs.mkdirSync(conAvatarDir, { recursive: true });
@@ -29,19 +30,48 @@ const conAvatarUpload = multer({
   },
 });
 
-function visibleUserWhere() {
+function visibleUserWhere(req) {
   const where = { show_on_homepage: true };
-  if (!appConfig.features.showTestUsers) {
+  if (!shouldIncludeTestData(req, appConfig.features.showTestUsers)) {
     where.is_test = false;
   }
   return where;
 }
 
-function visibleHotelUserWhere() {
+function visibleHotelUserWhere(req) {
   return {
-    ...visibleUserWhere(),
+    ...visibleUserWhere(req),
     show_hotel_info: true,
   };
+}
+
+function visibleConWhere(req) {
+  const where = { status: 'approved' };
+  if (!shouldIncludeTestData(req, appConfig.features.showTestCons)) {
+    where.is_test = false;
+  }
+  return where;
+}
+
+function visibleHotelWhere(req) {
+  const where = {};
+  if (!shouldIncludeTestData(req, true)) {
+    where.is_test = false;
+  }
+  return where;
+}
+
+async function findVisibleConById(req, id, options = {}) {
+  const where = {
+    id,
+    ...(!shouldIncludeTestData(req, appConfig.features.showTestCons) ? { is_test: false } : {}),
+  };
+
+  if (options.requireApproved !== false) {
+    where.status = 'approved';
+  }
+
+  return Con.findOne({ where });
 }
 
 function normalizeHotelKeyPart(value) {
@@ -51,11 +81,7 @@ function normalizeHotelKeyPart(value) {
 // GET /api/cons - List all cons
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const where = { status: 'approved' };
-    
-    if (!appConfig.features.showTestCons) {
-      where.is_test = false;
-    }
+    const where = visibleConWhere(req);
 
     const { upcoming, current, past, city, country, search, series } = req.query;
     const now = new Date().toISOString().split('T')[0];
@@ -91,7 +117,7 @@ router.get('/', optionalAuth, async (req, res) => {
         model: User,
         attributes: ['id', 'username', 'display_name', 'avatar_url', 'theme_color'],
         through: { attributes: [] },
-        where: visibleUserWhere(),
+        where: visibleUserWhere(req),
         required: false,
       }],
     });
@@ -106,10 +132,7 @@ router.get('/', optionalAuth, async (req, res) => {
 // GET /api/cons/map - Get cons for map display
 router.get('/map', async (req, res) => {
   try {
-    const where = { status: 'approved' };
-    if (!appConfig.features.showTestCons) {
-      where.is_test = false;
-    }
+    const where = visibleConWhere(req);
 
     const cons = await Con.findAll({
       where,
@@ -122,7 +145,7 @@ router.get('/map', async (req, res) => {
         model: User,
         attributes: ['id', 'username', 'display_name', 'avatar_url', 'theme_color'],
         through: { attributes: [] },
-        where: visibleUserWhere(),
+        where: visibleUserWhere(req),
         required: false,
       }],
     });
@@ -154,13 +177,9 @@ router.get('/map', async (req, res) => {
 router.get('/series/:seriesKey', async (req, res) => {
   try {
     const where = {
-      status: 'approved',
+      ...visibleConWhere(req),
       series_key: req.params.seriesKey,
     };
-
-    if (!appConfig.features.showTestCons) {
-      where.is_test = false;
-    }
 
     const cons = await Con.findAll({
       where,
@@ -177,9 +196,7 @@ router.get('/series/:seriesKey', async (req, res) => {
 // GET /api/cons/:id/hotel-stats - Public hotel distribution for one con
 router.get('/:id/hotel-stats', async (req, res) => {
   try {
-    const con = await Con.findByPk(req.params.id, {
-      attributes: ['id', 'name'],
-    });
+    const con = await findVisibleConById(req, req.params.id);
 
     if (!con) {
       return res.status(404).json({ error: 'Con not found' });
@@ -191,12 +208,13 @@ router.get('/:id/hotel-stats', async (req, res) => {
         {
           model: User,
           attributes: ['id'],
-          where: visibleHotelUserWhere(),
+          where: visibleHotelUserWhere(req),
           required: true,
         },
         {
           model: Hotel,
           attributes: ['id', 'name', 'address', 'city', 'country'],
+          where: visibleHotelWhere(req),
           through: { attributes: [] },
           required: true,
         },
@@ -247,12 +265,16 @@ router.get('/:id/hotel-stats', async (req, res) => {
 // GET /api/cons/:id - Get single con with attendees
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
-    const con = await Con.findByPk(req.params.id, {
+    const con = await Con.findOne({
+      where: {
+        id: req.params.id,
+        ...visibleConWhere(req),
+      },
       include: [{
         model: User,
         attributes: ['id', 'username', 'display_name', 'avatar_url', 'theme_color'],
         through: { attributes: ['comment', 'rating'] },
-        where: visibleUserWhere(),
+        where: visibleUserWhere(req),
         required: false,
       }],
     });
@@ -317,7 +339,7 @@ router.post('/', authenticate, [
 // POST /api/cons/:id/avatar - Upload a convention avatar/poster thumbnail
 router.post('/:id/avatar', authenticate, conAvatarUpload.single('avatar'), async (req, res) => {
   try {
-    const con = await Con.findByPk(req.params.id);
+    const con = await findVisibleConById(req, req.params.id, { requireApproved: false });
     if (!con) {
       return res.status(404).json({ error: 'Con not found' });
     }
@@ -341,7 +363,7 @@ router.post('/:id/avatar', authenticate, conAvatarUpload.single('avatar'), async
 // POST /api/cons/:id/attend - Mark attendance
 router.post('/:id/attend', authenticate, async (req, res) => {
   try {
-    const con = await Con.findByPk(req.params.id);
+    const con = await findVisibleConById(req, req.params.id, { requireApproved: false });
     if (!con) {
       return res.status(404).json({ error: 'Con not found' });
     }
@@ -415,6 +437,11 @@ router.post('/:id/attend', authenticate, async (req, res) => {
 // DELETE /api/cons/:id/attend - Remove attendance
 router.delete('/:id/attend', authenticate, async (req, res) => {
   try {
+    const con = await findVisibleConById(req, req.params.id, { requireApproved: false });
+    if (!con) {
+      return res.status(404).json({ error: 'Con not found' });
+    }
+
     const userCon = await UserCon.findOne({
       where: { user_id: req.userId, con_id: req.params.id },
     });
@@ -437,12 +464,17 @@ router.delete('/:id/attend', authenticate, async (req, res) => {
 // GET /api/cons/:id/attendees - Get attendees for a con (for homepage popup)
 router.get('/:id/attendees', async (req, res) => {
   try {
+    const con = await findVisibleConById(req, req.params.id);
+    if (!con) {
+      return res.status(404).json({ error: 'Con not found' });
+    }
+
     const userCons = await UserCon.findAll({
       where: { con_id: req.params.id },
       include: [{
         model: User,
         attributes: ['id', 'username', 'display_name', 'avatar_url', 'theme_color', 'show_on_homepage'],
-        where: visibleUserWhere(),
+        where: visibleUserWhere(req),
       }],
     });
 
@@ -466,7 +498,7 @@ router.get('/:id/attendees', async (req, res) => {
 // PUT /api/cons/:id - Update con (admin or submitter)
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const con = await Con.findByPk(req.params.id);
+    const con = await findVisibleConById(req, req.params.id, { requireApproved: false });
     if (!con) {
       return res.status(404).json({ error: 'Con not found' });
     }

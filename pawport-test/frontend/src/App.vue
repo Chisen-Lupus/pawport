@@ -6,6 +6,17 @@
           <span class="logo-icon">🐾</span>
           <span class="logo-text">PawPort</span>
         </router-link>
+        <button
+          class="test-data-btn"
+          :class="{ active: visibilityStore.showTestData }"
+          type="button"
+          :aria-pressed="visibilityStore.showTestData"
+          :title="visibilityStore.showTestData ? $t('nav.testDataOff') : $t('nav.testDataOn')"
+          @click="visibilityStore.toggleTestData()"
+        >
+          <span class="test-data-dot"></span>
+          <span>{{ visibilityStore.showTestData ? $t('nav.testDataOn') : $t('nav.testDataOff') }}</span>
+        </button>
       </div>
       
       <nav class="header-nav">
@@ -40,7 +51,7 @@
     <main class="app-main">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
-          <component :is="Component" />
+          <component :is="Component" :key="pageKey" />
         </transition>
       </router-view>
       
@@ -56,14 +67,18 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
+import { useVisibilityStore } from '@/stores/visibility'
 import UserPanel from '@/components/UserPanel.vue'
 
 const { locale } = useI18n()
+const route = useRoute()
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
+const visibilityStore = useVisibilityStore()
 
 const showPanel = ref(false)
 const isMapFullscreen = ref(false)
@@ -75,6 +90,8 @@ const extensions = ref({
 const appStyle = computed(() => ({
   '--user-primary': authStore.isLoggedIn ? authStore.themeColor : 'var(--primary)',
 }))
+
+const pageKey = computed(() => `${route.fullPath}:${visibilityStore.showTestData ? 'tests-on' : 'tests-off'}`)
 
 function toggleLocale() {
   const newLocale = themeStore.locale === 'zh' ? 'en' : 'zh'
@@ -117,6 +134,13 @@ onMounted(async () => {
   position: relative;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .logo {
   display: flex;
   align-items: center;
@@ -129,6 +153,44 @@ onMounted(async () => {
   .logo-icon {
     font-size: 1.4em;
   }
+}
+
+.test-data-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-card) 90%, transparent);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.84em;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  transition: color var(--transition), border-color var(--transition), background var(--transition), transform var(--transition);
+
+  &:hover {
+    transform: translateY(-1px);
+    color: var(--text);
+  }
+
+  &.active {
+    color: var(--user-primary, var(--primary));
+    border-color: var(--user-primary, var(--primary));
+  }
+}
+
+.test-data-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+  flex: 0 0 auto;
 }
 
 .header-nav {

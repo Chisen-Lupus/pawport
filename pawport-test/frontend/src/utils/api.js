@@ -14,6 +14,10 @@ api.interceptors.request.use(config => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
+  const showTestData = localStorage.getItem('pawport-show-test-data') !== 'false'
+  config.headers['X-Pawport-Test-Data'] = showTestData ? 'true' : 'false'
+
   return config
 })
 

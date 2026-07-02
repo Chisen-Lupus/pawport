@@ -12,7 +12,9 @@
     "register": "注册",
     "logout": "退出",
     "profile": "个人资料",
-    "settings": "设置"
+    "settings": "设置",
+    "testDataOn": "测试数据：开",
+    "testDataOff": "测试数据：关"
   },
   "map": {
     "activeCon": "正在进行",

@@ -12,7 +12,9 @@
     "register": "Register",
     "logout": "Logout",
     "profile": "Profile",
-    "settings": "Settings"
+    "settings": "Settings",
+    "testDataOn": "Test Data: On",
+    "testDataOff": "Test Data: Off"
   },
   "map": {
     "activeCon": "Active Now",
