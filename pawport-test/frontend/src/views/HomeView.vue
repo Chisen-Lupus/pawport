@@ -7,6 +7,19 @@
         <span class="control-icon">~</span>
         <span class="control-label">{{ showTrajectories ? $t('map.hideTrajectories') : $t('map.showTrajectories') }}</span>
       </button>
+      <button class="control-btn" @click="toggleNoTrajectoryNodes" :class="{ active: hideNoTrajectoryNodes }">
+        <span class="control-icon">•</span>
+        <span class="control-label">{{ hideNoTrajectoryNodes ? $t('map.showNoTrajectoryNodes') : $t('map.hideNoTrajectoryNodes') }}</span>
+      </button>
+      <button
+        v-if="authStore.isLoggedIn"
+        class="control-btn"
+        @click="toggleOnlyMine"
+        :class="{ active: showOnlyMine }"
+      >
+        <span class="control-icon">★</span>
+        <span class="control-label">{{ showOnlyMine ? $t('map.showAllCons') : $t('map.onlyMine') }}</span>
+      </button>
       <button class="control-btn clear-btn" @click="clearWindows" :disabled="windows.length === 0">
         <span class="control-icon">×</span>
         <span class="control-label">{{ $t('map.clearWindows') }}</span>
@@ -195,6 +208,8 @@ const themeStore = useThemeStore()
 
 const mapContainer = ref(null)
 const showTrajectories = ref(true)
+const hideNoTrajectoryNodes = ref(false)
+const showOnlyMine = ref(false)
 const showActiveCallouts = ref(true)
 const windows = ref([])
 const myConIds = ref(new Set())
@@ -210,7 +225,7 @@ let windowZ = 2100
 let dragState = null
 let trajectoryHideTimer = null
 let currentUserTrajectoryTimer = null
-let trajectoryUsers = []
+const trajectoryUsers = ref([])
 const trajectoryLayersByUser = new Map()
 
 function toDateInput(date) {
@@ -273,7 +288,31 @@ const mapLabels = [
   { type: 'city', lat: 52.52, lng: 13.405, zh: '柏林', en: 'Berlin' },
 ]
 
-const filteredCons = computed(() => consStore.mapCons.filter(conMatchesFilters))
+const candidateCons = computed(() => {
+  const base = consStore.mapCons.filter(conMatchesFilters)
+  if (showOnlyMine.value && authStore.isLoggedIn) {
+    return base.filter(con => myConIds.value.has(con.id))
+  }
+  return base
+})
+
+const trajectoryNodeIds = computed(() => {
+  const candidateIds = new Set(candidateCons.value.map(con => con.id))
+  const nodeIds = new Set()
+
+  trajectoryUsers.value.forEach(user => {
+    const visits = getSortedTrajectoryVisits(user, candidateIds)
+    if (visits.length < 2) return
+    visits.forEach(visit => nodeIds.add(visit.Con.id))
+  })
+
+  return nodeIds
+})
+
+const filteredCons = computed(() => {
+  if (!hideNoTrajectoryNodes.value) return candidateCons.value
+  return candidateCons.value.filter(con => trajectoryNodeIds.value.has(con.id))
+})
 const activeCons = computed(() => filteredCons.value.filter(con => con.isActive))
 
 function displayName(user) {
@@ -337,6 +376,21 @@ function clearWindows() {
 function toggleActiveCallouts() {
   showActiveCallouts.value = !showActiveCallouts.value
   renderMarkers()
+}
+
+function toggleOnlyMine() {
+  showOnlyMine.value = !showOnlyMine.value
+  renderMarkers()
+  renderTrajectories()
+}
+
+async function toggleNoTrajectoryNodes() {
+  hideNoTrajectoryNodes.value = !hideNoTrajectoryNodes.value
+  if (hideNoTrajectoryNodes.value && !trajectoryUsers.value.length) {
+    await loadTrajectoryUsers()
+  }
+  renderMarkers()
+  renderTrajectories()
 }
 
 function resetFilters() {
@@ -833,17 +887,26 @@ async function renderTrajectories() {
   clearTimeout(currentUserTrajectoryTimer)
   trajectoriesLayer.clearLayers()
   trajectoryLayersByUser.clear()
-  trajectoryUsers = []
   if (!showTrajectories.value) return
 
   try {
-    const res = await api.get('/users')
-    trajectoryUsers = res.data.users || []
-    const segmentCounts = collectSegmentCounts(trajectoryUsers)
-    trajectoryUsers.forEach(user => drawUserTrajectory(user, segmentCounts))
+    await loadTrajectoryUsers()
+    const segmentCounts = collectSegmentCounts(trajectoryUsers.value)
+    trajectoryUsers.value.forEach(user => drawUserTrajectory(user, segmentCounts))
   } catch (error) {
     console.warn('Failed to render trajectories:', error)
   }
+}
+
+async function loadTrajectoryUsers() {
+  try {
+    const res = await api.get('/users')
+    trajectoryUsers.value = res.data.users || []
+  } catch (error) {
+    trajectoryUsers.value = []
+    throw error
+  }
+  return trajectoryUsers.value
 }
 
 function collectSegmentCounts(users) {
@@ -972,13 +1035,16 @@ async function refreshCurrentUserTrajectory({ animate = true } = {}) {
   try {
     const res = await api.get(`/users/${authStore.user.id}`)
     const currentUser = normalizeCurrentUserTrajectory(res.data.user)
-    trajectoryUsers = trajectoryUsers.filter(user => user.id !== currentUser.id)
+    trajectoryUsers.value = trajectoryUsers.value.filter(user => user.id !== currentUser.id)
     if (canShowTrajectory(currentUser)) {
-      trajectoryUsers.push(currentUser)
+      trajectoryUsers.value.push(currentUser)
     }
 
-    const segmentCounts = collectSegmentCounts(trajectoryUsers)
+    const segmentCounts = collectSegmentCounts(trajectoryUsers.value)
     removeUserTrajectory(currentUser.id, animate)
+    if (hideNoTrajectoryNodes.value) {
+      renderMarkers()
+    }
     if (!showTrajectories.value || !canShowTrajectory(currentUser)) return
 
     const redraw = () => drawUserTrajectory(currentUser, segmentCounts, animate)
@@ -1111,8 +1177,20 @@ async function loadMyCons() {
 async function refreshMapData() {
   await loadMyCons()
   await consStore.fetchMapCons()
+  if (showTrajectories.value || hideNoTrajectoryNodes.value) {
+    try {
+      await loadTrajectoryUsers()
+    } catch (error) {
+      console.warn('Failed to load trajectory users:', error)
+    }
+  }
   renderMarkers()
-  renderTrajectories()
+  if (showTrajectories.value) {
+    const segmentCounts = collectSegmentCounts(trajectoryUsers.value)
+    trajectoriesLayer?.clearLayers()
+    trajectoryLayersByUser.clear()
+    trajectoryUsers.value.forEach(user => drawUserTrajectory(user, segmentCounts))
+  }
 }
 
 function toggleTrajectories() {
@@ -1180,6 +1258,9 @@ watch(() => themeStore.locale, () => {
 })
 
 watch(() => authStore.user?.id, async () => {
+  if (!authStore.user?.id) {
+    showOnlyMine.value = false
+  }
   await refreshMapData()
 })
 
@@ -1304,7 +1385,7 @@ watch(
   position: absolute;
   top: 16px;
   right: 16px;
-  z-index: 800;
+  z-index: 1100;
   appearance: none;
   display: flex;
   align-items: center;

@@ -71,6 +71,33 @@ async function seed() {
         longitude: 116.3974,
         is_test: true,
       },
+      {
+        name: '上海夏日会展酒店',
+        address: '上海市浦东新区夏日路66号',
+        city: '上海',
+        country: '中国',
+        latitude: 31.2254,
+        longitude: 121.4927,
+        is_test: true,
+      },
+      {
+        name: '杭州湖畔酒店',
+        address: '浙江省杭州市滨江区星光大道18号',
+        city: '杭州',
+        country: '中国',
+        latitude: 30.2084,
+        longitude: 120.212,
+        is_test: true,
+      },
+      {
+        name: '广州星港酒店',
+        address: '广东省广州市海珠区星港路42号',
+        city: '广州',
+        country: '中国',
+        latitude: 23.0969,
+        longitude: 113.3245,
+        is_test: true,
+      },
     ]);
     console.log(`  ✅ Created ${hotels.length} test hotels`);
 
@@ -219,6 +246,66 @@ async function seed() {
         status: 'approved',
         is_test: true,
       },
+      {
+        name: '夏日兽聚 2026',
+        name_en: 'Summer PawMeet 2026',
+        name_local: '夏日兽聚',
+        series_key: 'summer-pawmeet',
+        series_name: '夏日兽聚 Summer PawMeet',
+        edition_label: '2026',
+        start_date: '2026-06-20',
+        end_date: '2026-06-22',
+        venue: '上海夏日会展中心',
+        city: '上海',
+        country: '中国',
+        address: '上海市浦东新区夏日路66号',
+        latitude: 31.2254,
+        longitude: 121.4927,
+        theme: '夏日汽水',
+        theme_color: '#F97316',
+        status: 'approved',
+        is_test: true,
+      },
+      {
+        name: '湖畔兽展 2026',
+        name_en: 'Lakeside FurCon 2026',
+        name_local: '湖畔兽展',
+        series_key: 'lakeside-furcon',
+        series_name: '湖畔兽展 Lakeside FurCon',
+        edition_label: '2026',
+        start_date: '2026-07-11',
+        end_date: '2026-07-13',
+        venue: '杭州湖畔会议中心',
+        city: '杭州',
+        country: '中国',
+        address: '浙江省杭州市滨江区星光大道18号',
+        latitude: 30.2084,
+        longitude: 120.212,
+        theme: '湖风夜航',
+        theme_color: '#0EA5E9',
+        status: 'approved',
+        is_test: true,
+      },
+      {
+        name: '星港兽展 2026',
+        name_en: 'Starport FurCon 2026',
+        name_local: '星港兽展',
+        series_key: 'starport-furcon',
+        series_name: '星港兽展 Starport FurCon',
+        edition_label: '2026',
+        start_date: '2026-08-01',
+        end_date: '2026-08-03',
+        venue: '广州星港会展中心',
+        city: '广州',
+        country: '中国',
+        address: '广东省广州市海珠区星港路42号',
+        latitude: 23.0969,
+        longitude: 113.3245,
+        theme: '星港启航',
+        theme_color: '#8B5CF6',
+        status: 'approved',
+        is_test: true,
+      },
     ]);
     console.log(`  ✅ Created ${cons.length} test cons`);
 
@@ -300,7 +387,7 @@ async function seed() {
           theme_color: palette[index % palette.length],
           bio: '当前展头像列表测试用户',
           show_on_homepage: true,
-          show_con_history: false,
+          show_con_history: index < 14,
           show_hotel_info: true,
           is_test: true,
           role: 'user',
@@ -328,6 +415,16 @@ async function seed() {
       
       // purplecat: 去过成都兽展
       { user_id: users[3].id, con_id: cons[1].id, comment: '和朋友一起去的~', rating: 4, visit_order: 1 },
+
+      // 2026 夏季测试路径 - 用于当前日期范围下观察轨迹宽度
+      { user_id: users[0].id, con_id: cons[7].id, comment: '夏季第一站', rating: 5, visit_order: 4 },
+      { user_id: users[0].id, con_id: cons[8].id, comment: '湖边很舒服', rating: 5, visit_order: 5 },
+      { user_id: users[0].id, con_id: cons[9].id, comment: '星港收尾', rating: 4, visit_order: 6 },
+      { user_id: users[1].id, con_id: cons[7].id, comment: '热力测试路线 A', rating: 5, visit_order: 5 },
+      { user_id: users[1].id, con_id: cons[8].id, comment: '热力测试路线 A', rating: 5, visit_order: 6 },
+      { user_id: users[1].id, con_id: cons[9].id, comment: '热力测试路线 A', rating: 5, visit_order: 7 },
+      { user_id: users[2].id, con_id: cons[7].id, comment: '跟着大家跑夏季展', rating: 4, visit_order: 3 },
+      { user_id: users[2].id, con_id: cons[8].id, comment: '第二站', rating: 4, visit_order: 4 },
     ]);
 
     const extraUserCons = await UserCon.bulkCreate(
@@ -338,7 +435,25 @@ async function seed() {
         visit_order: 1,
       }))
     );
-    console.log(`  ✅ Created ${userCons.length + extraUsers.length} user-con relationships`);
+
+    const summerRoutes = [
+      [7, 8, 9],
+      [7, 8],
+      [8, 9],
+      [7, 9],
+    ];
+    const extraSummerUserCons = await UserCon.bulkCreate(
+      extraUsers.flatMap((user, index) => (
+        summerRoutes[index % summerRoutes.length].map((conIndex, routeIndex) => ({
+          user_id: user.id,
+          con_id: cons[conIndex].id,
+          comment: '2026 夏季轨迹热力测试',
+          rating: 4 + (routeIndex % 2),
+          visit_order: routeIndex + 2,
+        }))
+      ))
+    );
+    console.log(`  ✅ Created ${userCons.length + extraUserCons.length + extraSummerUserCons.length} user-con relationships`);
 
     // Create user-con-hotel relationships
     await UserConHotel.bulkCreate([
@@ -354,6 +469,12 @@ async function seed() {
         hotel_id: hotels[4 + (index % 3)].id,
         check_in: '2026-07-01',
         check_out: '2026-07-03',
+      })),
+      ...extraSummerUserCons.map((userCon, index) => ({
+        user_con_id: userCon.id,
+        hotel_id: hotels[7 + (index % 3)].id,
+        check_in: ['2026-06-19', '2026-07-10', '2026-07-31'][index % 3],
+        check_out: ['2026-06-23', '2026-07-14', '2026-08-04'][index % 3],
       })),
     ]);
     console.log('  ✅ Created hotel assignments');
