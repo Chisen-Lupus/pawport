@@ -156,14 +156,16 @@ onMounted(async () => {
 .icon-btn {
   background: none;
   border: none;
+  color: var(--text-secondary);
   font-size: 1.2em;
   cursor: pointer;
   padding: 6px;
   border-radius: var(--radius-sm);
-  transition: background var(--transition);
+  transition: background var(--transition), color var(--transition);
   
   &:hover {
-    background: var(--bg-secondary);
+    background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
+    color: var(--text);
   }
 }
 
