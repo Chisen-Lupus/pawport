@@ -18,7 +18,7 @@ module.exports = {
   
   // FCC API Token
   fcc: {
-    token: process.env.FCC_TOKEN || '',
+    token: process.env.FCC_TOKEN || process.env.FURRYCONS_API_KEY || '',
   },
   
   // OAuth配置（未来启用）

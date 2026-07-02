@@ -37,7 +37,11 @@ module.exports = {
     enableHotelCoordination: false,
   },
   fcc: {
-    baseUrl: 'https://api.furrycons.cn/open/event/',
+    baseUrl: 'https://api.furrycons.cn/open',
+    calendarPath: '/event/recent',
+    detailPath: '/event',
+    keepOld: true,
+    fetchDetails: true,
     syncInterval: 24 * 60 * 60 * 1000,
   },
 };

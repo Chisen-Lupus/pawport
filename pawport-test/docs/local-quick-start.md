@@ -17,6 +17,9 @@ cd backend
 npm install
 node database/init.js
 node database/seed.js
+# 可选：接入 FCC 兽展日历
+# export FCC_TOKEN='你的 FurryConsCN open API token'
+# npm run sync:fcc
 
 # 5. 启动后端（保持运行）
 npm run dev

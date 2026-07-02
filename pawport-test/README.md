@@ -55,7 +55,7 @@ open http://localhost:5173
 - Database settings (`sqlite` locally, `mysql` in production)
 - JWT secret
 - OAuth keys
-- FCC API token
+- FCC API token (`FCC_TOKEN` or `FURRYCONS_API_KEY`)
 
 ## Deployment to Production
 
@@ -127,7 +127,11 @@ features: {
 
 ## FCC Sync
 
-Automatically syncs convention data from [FurryConsCN](https://docs.furrycons.cn/docs/api/event/list).
+Automatically syncs convention data from the FurryConsCN open calendar endpoint used in `furrycons-api.ipynb`:
+
+- Calendar list: `GET /open/event/recent?keepOld=true`
+- Optional detail fill: `GET /open/event/:id`
+- Auth header: `Authorization: <token>` 
 
 Manual sync: `./deploy.sh sync-fcc`
 
