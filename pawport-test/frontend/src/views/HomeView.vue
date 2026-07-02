@@ -1000,8 +1000,8 @@ function generateCurve(start, end) {
   const dy = end[0] - start[0]
   const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 0.0001)
   const offset = dist * 0.18
-  const offsetLat = midLat + (dx / dist) * offset
-  const offsetLng = midLng - (dy / dist) * offset
+  const offsetLat = midLat - (dx / dist) * offset
+  const offsetLng = midLng + (dy / dist) * offset
 
   for (let step = 0; step <= 24; step++) {
     const t = step / 24
