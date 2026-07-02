@@ -34,24 +34,23 @@
           <input v-model="form.theme_color" type="color" class="color-input" />
         </div>
         
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="form.show_on_homepage" />
-            {{ $t('user.showOnHomepage') }}
+        <div class="settings-list">
+          <label class="switch-row">
+            <span class="switch-copy">{{ $t('user.showOnHomepage') }}</span>
+            <input class="switch-input" type="checkbox" v-model="form.show_on_homepage" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
           </label>
-        </div>
-        
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="form.show_con_history" />
-            {{ $t('user.showHistory') }}
+
+          <label class="switch-row" :class="{ disabled: !form.show_on_homepage }">
+            <span class="switch-copy">{{ $t('user.showHistory') }}</span>
+            <input class="switch-input" type="checkbox" v-model="form.show_con_history" :disabled="!form.show_on_homepage" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
           </label>
-        </div>
-        
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input type="checkbox" v-model="form.show_hotel_info" />
-            {{ $t('user.showHotel') }}
+
+          <label class="switch-row">
+            <span class="switch-copy">{{ $t('user.showHotel') }}</span>
+            <input class="switch-input" type="checkbox" v-model="form.show_hotel_info" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
           </label>
         </div>
         
@@ -70,17 +69,54 @@
         <p class="history-hint">{{ $t('user.conHistoryHint') }}</p>
         
         <div class="my-cons">
-          <div v-for="uc in userCons" :key="uc.id" class="my-con-item">
-            <div class="my-con-info">
-              <strong>{{ uc.Con?.name || 'Unknown' }}</strong>
-              <span class="con-date">{{ uc.Con?.start_date }}</span>
-              <span v-if="uc.comment" class="con-comment">{{ uc.comment }}</span>
-              <span v-if="uc.Hotels?.length" class="con-hotels">
-                {{ $t('con.hotel') }}: {{ uc.Hotels.map(hotel => hotel.name).join(', ') }}
-              </span>
+          <article v-for="uc in userCons" :key="uc.id" class="my-con-item">
+            <div class="my-con-main">
+              <div class="my-con-info">
+                <strong>{{ uc.Con?.name || 'Unknown' }}</strong>
+                <span class="con-date">{{ uc.Con?.start_date }}</span>
+                <span v-if="uc.comment" class="con-comment">{{ uc.comment }}</span>
+                <span v-if="uc.Hotels?.length" class="con-hotels">
+                  {{ $t('con.hotel') }}: {{ uc.Hotels.map(hotel => hotel.name).join(', ') }}
+                </span>
+              </div>
+              <div class="my-con-actions">
+                <button class="link-btn compact" @click="toggleHistoryHotelEditor(uc)">
+                  {{ hotelEditors[uc.id]?.open ? $t('common.close') : $t('hotel.editHotels') }}
+                </button>
+                <button class="remove-btn" @click="removeFromCon(uc.con_id)">×</button>
+              </div>
             </div>
-            <button class="remove-btn" @click="removeFromCon(uc.con_id)">×</button>
-          </div>
+
+            <div v-if="hotelEditors[uc.id]?.open" class="history-hotel-editor">
+              <label class="switch-row small">
+                <span class="switch-copy">{{ $t('hotel.useVenue') }}</span>
+                <input
+                  class="switch-input"
+                  type="checkbox"
+                  :checked="hotelEditors[uc.id].useVenue"
+                  @change="toggleVenueHotel(uc, $event.target.checked)"
+                />
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+              </label>
+
+              <div v-for="(hotel, index) in hotelEditors[uc.id].hotels" :key="index" class="hotel-row history">
+                <input v-model="hotel.name" :placeholder="$t('hotel.name')" />
+                <input v-model="hotel.address" :placeholder="$t('hotel.address')" />
+                <div class="form-row">
+                  <input v-model="hotel.check_in" type="date" />
+                  <input v-model="hotel.check_out" type="date" />
+                </div>
+                <button class="remove-hotel" @click="removeHistoryHotelRow(uc, index)">×</button>
+              </div>
+
+              <div class="history-hotel-actions">
+                <button class="link-btn" @click="addHistoryHotelRow(uc)">+ {{ $t('con.addHotel') }}</button>
+                <button class="btn btn-primary" @click="saveHistoryHotels(uc)" :disabled="savingHotelConId === uc.id">
+                  {{ savingHotelConId === uc.id ? $t('common.loading') : $t('hotel.saveHotels') }}
+                </button>
+              </div>
+            </div>
+          </article>
         </div>
         
         <button class="btn btn-outline btn-full" @click="showAddCon = true">
@@ -254,7 +290,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useConsStore } from '@/stores/cons'
@@ -277,6 +313,8 @@ const uploadingAvatar = ref(false)
 const uploadingConAvatar = ref(false)
 const newConAvatarFile = ref(null)
 const newConAvatarPreview = ref('')
+const hotelEditors = reactive({})
+const savingHotelConId = ref('')
 
 const form = reactive({
   display_name: authStore.user?.display_name || '',
@@ -304,7 +342,10 @@ const attendanceForm = reactive({
 async function saveProfile() {
   saving.value = true
   try {
-    const res = await authStore.updateProfile({ ...form })
+    const res = await authStore.updateProfile({
+      ...form,
+      show_con_history: form.show_on_homepage && form.show_con_history,
+    })
     notifyProfileUpdated(res.user)
     saved.value = true
     setTimeout(() => { saved.value = false }, 2000)
@@ -371,6 +412,7 @@ async function fetchUserCons() {
   try {
     const res = await api.get(`/users/${authStore.user.id}`)
     userCons.value = res.data.user.cons || []
+    syncHotelEditors()
   } catch (error) {
     console.warn('Failed to fetch user cons')
   }
@@ -406,13 +448,25 @@ function selectConForAttendance(con) {
 
 function addHotelRow() {
   attendanceForm.hotels.push({
-    name: '',
-    address: '',
-    city: selectedCon.value?.city || newCon.city || '',
-    country: selectedCon.value?.country || newCon.country || '中国',
-    check_in: '',
-    check_out: '',
+    ...buildVenueHotelRow(selectedCon.value),
+    fromVenue: false,
   })
+}
+
+function buildVenueHotelRow(conLike) {
+  const con = conLike?.Con || conLike || {}
+  return {
+    name: con.venue || '',
+    address: con.address || '',
+    city: con.city || selectedCon.value?.city || newCon.city || '',
+    country: con.country || selectedCon.value?.country || newCon.country || '中国',
+    latitude: con.latitude || null,
+    longitude: con.longitude || null,
+    check_in: con.start_date || '',
+    check_out: con.end_date || '',
+    notes: '',
+    fromVenue: true,
+  }
 }
 
 function removeHotelRow(index) {
@@ -423,13 +477,129 @@ function buildAttendancePayload() {
   return {
     comment: attendanceForm.comment || undefined,
     rating: attendanceForm.rating || undefined,
-    hotels: attendanceForm.hotels
-      .filter(hotel => hotel.name)
-      .map(hotel => ({
-        ...hotel,
-        check_in: hotel.check_in || undefined,
-        check_out: hotel.check_out || undefined,
-      })),
+    hotels: buildHotelPayload(attendanceForm.hotels, selectedCon.value),
+  }
+}
+
+function buildHotelPayload(rows, conLike) {
+  const con = conLike?.Con || conLike || {}
+  return rows
+    .filter(hotel => hotel.name)
+    .map(hotel => ({
+      name: hotel.name,
+      address: hotel.address || undefined,
+      city: hotel.city || con.city || undefined,
+      country: hotel.country || con.country || undefined,
+      latitude: hotel.latitude || undefined,
+      longitude: hotel.longitude || undefined,
+      check_in: hotel.check_in || undefined,
+      check_out: hotel.check_out || undefined,
+      notes: hotel.notes || undefined,
+    }))
+}
+
+function hotelRowsFromVisit(visit) {
+  return (visit.Hotels || []).map(hotel => ({
+    name: hotel.name || '',
+    address: hotel.address || '',
+    city: hotel.city || visit.Con?.city || '',
+    country: hotel.country || visit.Con?.country || '',
+    latitude: hotel.latitude || null,
+    longitude: hotel.longitude || null,
+    check_in: hotel.UserConHotel?.check_in || '',
+    check_out: hotel.UserConHotel?.check_out || '',
+    notes: hotel.UserConHotel?.notes || '',
+    fromVenue: false,
+  }))
+}
+
+function createHotelEditor(visit) {
+  return {
+    open: false,
+    useVenue: false,
+    hotels: hotelRowsFromVisit(visit),
+  }
+}
+
+function syncHotelEditors() {
+  const currentIds = new Set(userCons.value.map(visit => visit.id))
+  Object.keys(hotelEditors).forEach(id => {
+    if (!currentIds.has(id)) delete hotelEditors[id]
+  })
+
+  userCons.value.forEach(visit => {
+    if (!hotelEditors[visit.id]) {
+      hotelEditors[visit.id] = createHotelEditor(visit)
+      return
+    }
+
+    if (!hotelEditors[visit.id].open) {
+      hotelEditors[visit.id].useVenue = false
+      hotelEditors[visit.id].hotels = hotelRowsFromVisit(visit)
+    }
+  })
+}
+
+function ensureHotelEditor(visit) {
+  if (!hotelEditors[visit.id]) {
+    hotelEditors[visit.id] = createHotelEditor(visit)
+  }
+  return hotelEditors[visit.id]
+}
+
+function toggleHistoryHotelEditor(visit) {
+  const editor = ensureHotelEditor(visit)
+  editor.open = !editor.open
+  if (editor.open && editor.hotels.length === 0) {
+    editor.useVenue = false
+  }
+}
+
+function toggleVenueHotel(visit, checked) {
+  const editor = ensureHotelEditor(visit)
+  editor.useVenue = checked
+  if (checked) {
+    const existingVenueRow = editor.hotels.some(hotel => hotel.fromVenue)
+    if (!existingVenueRow) {
+      editor.hotels.unshift(buildVenueHotelRow(visit))
+    }
+    return
+  }
+
+  editor.hotels = editor.hotels.filter(hotel => !hotel.fromVenue)
+}
+
+function addHistoryHotelRow(visit) {
+  const editor = ensureHotelEditor(visit)
+  editor.hotels.push({
+    ...buildVenueHotelRow(visit),
+    fromVenue: false,
+  })
+}
+
+function removeHistoryHotelRow(visit, index) {
+  const editor = ensureHotelEditor(visit)
+  editor.hotels.splice(index, 1)
+  editor.useVenue = editor.hotels.some(hotel => hotel.fromVenue)
+}
+
+async function saveHistoryHotels(visit) {
+  const editor = ensureHotelEditor(visit)
+  savingHotelConId.value = visit.id
+  try {
+    await consStore.markAttendance(visit.con_id, {
+      comment: visit.comment || undefined,
+      rating: visit.rating || undefined,
+      hotels: buildHotelPayload(editor.hotels, visit),
+    })
+    editor.open = false
+    await fetchUserCons()
+    await consStore.fetchMapCons()
+    window.dispatchEvent(new CustomEvent('pawport-attendance-updated', { detail: { conId: visit.con_id } }))
+  } catch (error) {
+    console.error('Failed to save hotels:', error)
+  } finally {
+    savingHotelConId.value = ''
   }
 }
 
@@ -465,6 +635,8 @@ function buildExportPayload() {
         name_en: visit.Con?.name_en,
         start_date: visit.Con?.start_date,
         end_date: visit.Con?.end_date,
+        venue: visit.Con?.venue,
+        address: visit.Con?.address,
         city: visit.Con?.city,
         country: visit.Con?.country,
         latitude: visit.Con?.latitude,
@@ -474,6 +646,9 @@ function buildExportPayload() {
         name: hotel.name,
         address: hotel.address,
         city: hotel.city,
+        country: hotel.country,
+        latitude: hotel.latitude,
+        longitude: hotel.longitude,
         check_in: hotel.UserConHotel?.check_in,
         check_out: hotel.UserConHotel?.check_out,
         notes: hotel.UserConHotel?.notes,
@@ -555,6 +730,12 @@ function handleLogout() {
 
 onMounted(() => {
   fetchUserCons()
+})
+
+watch(() => form.show_on_homepage, value => {
+  if (!value) {
+    form.show_con_history = false
+  }
 })
 </script>
 
@@ -740,6 +921,86 @@ onMounted(() => {
   .form-group { flex: 1; }
 }
 
+.settings-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: border-color var(--transition), opacity var(--transition), background var(--transition);
+
+  &.small {
+    min-height: 36px;
+    padding: 6px 8px;
+    background: var(--bg);
+  }
+
+  &.disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.switch-copy {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.88em;
+  font-weight: 600;
+}
+
+.switch-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch-track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  border: 1px solid var(--border);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  transition: transform var(--transition);
+}
+
+.switch-input:checked + .switch-track {
+  background: var(--user-primary, var(--primary));
+  border-color: var(--user-primary, var(--primary));
+}
+
+.switch-input:checked + .switch-track .switch-thumb {
+  transform: translateX(20px);
+}
+
+.switch-input:disabled + .switch-track {
+  opacity: 0.6;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -801,12 +1062,16 @@ onMounted(() => {
 }
 
 .my-con-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 10px 12px;
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
+
+  .my-con-main {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
   
   .my-con-info {
     display: flex;
@@ -815,6 +1080,19 @@ onMounted(() => {
     
     strong { font-size: 0.9em; }
     .con-date { font-size: 0.8em; color: var(--text-secondary); }
+    .con-comment,
+    .con-hotels {
+      color: var(--text-secondary);
+      font-size: 0.8em;
+      line-height: 1.35;
+    }
+  }
+
+  .my-con-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
   }
   
   .remove-btn {
@@ -826,6 +1104,31 @@ onMounted(() => {
     border-radius: var(--radius-sm);
     
     &:hover { background: #FEE; color: #E53E3E; }
+  }
+}
+
+.history-hotel-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.hotel-row.history {
+  background: var(--bg);
+}
+
+.history-hotel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  .btn {
+    min-height: 32px;
+    padding: 6px 12px;
+    font-size: 0.82em;
   }
 }
 
@@ -904,6 +1207,11 @@ onMounted(() => {
 .link-btn {
   color: var(--user-primary, var(--primary));
   font-weight: 600;
+}
+
+.link-btn.compact {
+  font-size: 0.78em;
+  white-space: nowrap;
 }
 
 .hotel-editor {

@@ -30,6 +30,7 @@
     "dateTo": "结束日期",
     "previousMonth": "-1月",
     "nextMonth": "+1月",
+    "allDates": "全部",
     "resetFilter": "重置"
   },
   "con": {
@@ -47,7 +48,7 @@
     "hotel": "住宿酒店",
     "addHotel": "添加酒店",
     "submitCon": "提交新展",
-    "website": "官方网站",
+    "website": "信息来源",
     "theme": "主题",
     "avatar": "展会头像",
     "uploadAvatar": "上传展会头像",
@@ -61,7 +62,11 @@
   },
   "hotel": {
     "name": "酒店名称",
-    "address": "地址"
+    "address": "地址",
+    "editHotels": "编辑酒店",
+    "useVenue": "使用会场作为酒店",
+    "saveHotels": "保存酒店",
+    "distribution": "住宿分布"
   },
   "user": {
     "profile": "个人资料",
@@ -74,8 +79,8 @@
     "themeColor": "主题色",
     "conHistory": "参展历史",
     "conHistoryHint": "也可以直接点开地图中的兽展，在窗口里添加到自己的参展历史。",
-    "showOnHomepage": "在首页展示",
-    "showHistory": "展示参展历史",
+    "showOnHomepage": "公开参展记录",
+    "showHistory": "在首页展示轨迹",
     "showHotel": "展示住宿信息",
     "save": "保存",
     "saved": "已保存",

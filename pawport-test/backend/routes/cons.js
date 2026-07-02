@@ -37,6 +37,17 @@ function visibleUserWhere() {
   return where;
 }
 
+function visibleHotelUserWhere() {
+  return {
+    ...visibleUserWhere(),
+    show_hotel_info: true,
+  };
+}
+
+function normalizeHotelKeyPart(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 // GET /api/cons - List all cons
 router.get('/', optionalAuth, async (req, res) => {
   try {
@@ -160,6 +171,76 @@ router.get('/series/:seriesKey', async (req, res) => {
   } catch (error) {
     console.error('Series cons error:', error);
     res.status(500).json({ error: 'Failed to fetch series' });
+  }
+});
+
+// GET /api/cons/:id/hotel-stats - Public hotel distribution for one con
+router.get('/:id/hotel-stats', async (req, res) => {
+  try {
+    const con = await Con.findByPk(req.params.id, {
+      attributes: ['id', 'name'],
+    });
+
+    if (!con) {
+      return res.status(404).json({ error: 'Con not found' });
+    }
+
+    const userCons = await UserCon.findAll({
+      where: { con_id: req.params.id },
+      include: [
+        {
+          model: User,
+          attributes: ['id'],
+          where: visibleHotelUserWhere(),
+          required: true,
+        },
+        {
+          model: Hotel,
+          attributes: ['id', 'name', 'address', 'city', 'country'],
+          through: { attributes: [] },
+          required: true,
+        },
+      ],
+    });
+
+    const grouped = new Map();
+    userCons.forEach(userCon => {
+      (userCon.Hotels || []).forEach(hotel => {
+        const hotelJson = hotel.toJSON ? hotel.toJSON() : hotel;
+        const key = [
+          normalizeHotelKeyPart(hotelJson.name),
+          normalizeHotelKeyPart(hotelJson.address),
+          normalizeHotelKeyPart(hotelJson.city),
+        ].join('|');
+
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            name: hotelJson.name,
+            address: hotelJson.address,
+            city: hotelJson.city,
+            country: hotelJson.country,
+            count: 0,
+          });
+        }
+
+        grouped.get(key).count += 1;
+      });
+    });
+
+    const total = [...grouped.values()].reduce((sum, hotel) => sum + hotel.count, 0);
+    const palette = ['#6C63FF', '#22C55E', '#F97316', '#0EA5E9', '#EF4444', '#14B8A6', '#A855F7', '#EAB308'];
+    const hotels = [...grouped.values()]
+      .sort((a, b) => b.count - a.count || String(a.name || '').localeCompare(String(b.name || '')))
+      .map((hotel, index) => ({
+        ...hotel,
+        percent: total ? Math.round((hotel.count / total) * 100) : 0,
+        color: palette[index % palette.length],
+      }));
+
+    res.json({ conId: con.id, total, hotels });
+  } catch (error) {
+    console.error('Hotel stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch hotel stats' });
   }
 });
 
@@ -296,17 +377,19 @@ router.post('/:id/attend', authenticate, async (req, res) => {
         let hotel;
         if (hotelData.hotel_id) {
           hotel = await Hotel.findByPk(hotelData.hotel_id);
-        } else if (hotelData.name) {
-          // Create new hotel
-          [hotel] = await Hotel.findOrCreate({
-            where: { name: hotelData.name, city: hotelData.city || con.city },
-            defaults: {
-              address: hotelData.address,
-              city: hotelData.city || con.city,
-              country: hotelData.country || con.country,
-              latitude: hotelData.latitude,
-              longitude: hotelData.longitude,
-            },
+        }
+
+        if (!hotel && hotelData.name) {
+          hotel = await Hotel.create({
+            name: hotelData.name,
+            address: hotelData.address,
+            city: hotelData.city || con.city,
+            country: hotelData.country || con.country,
+            latitude: hotelData.latitude,
+            longitude: hotelData.longitude,
+            website: hotelData.website,
+            phone: hotelData.phone,
+            extra_fields: hotelData.extra_fields || {},
           });
         }
         

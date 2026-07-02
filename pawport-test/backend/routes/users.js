@@ -60,12 +60,15 @@ router.get('/:id', optionalAuth, async (req, res) => {
         include: [
           {
             model: Con,
-            attributes: ['id', 'name', 'name_en', 'start_date', 'end_date', 'city', 'country', 'latitude', 'longitude', 'avatar_url', 'theme_color'],
+            attributes: [
+              'id', 'name', 'name_en', 'start_date', 'end_date', 'venue', 'address',
+              'city', 'country', 'latitude', 'longitude', 'avatar_url', 'theme_color',
+            ],
           },
           {
             model: Hotel,
             through: { attributes: ['check_in', 'check_out', 'notes'] },
-            attributes: ['id', 'name', 'address', 'city'],
+            attributes: ['id', 'name', 'address', 'city', 'country', 'latitude', 'longitude'],
           },
         ],
         attributes: ['id', 'con_id', 'comment', 'rating', 'visit_order', 'extra_fields'],

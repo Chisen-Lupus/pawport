@@ -26,6 +26,7 @@
         <button class="filter-step" @click="shiftDateRange(1)" :aria-label="$t('map.nextMonth')">
           {{ $t('map.nextMonth') }}
         </button>
+        <button class="filter-step" @click="showAllDates">{{ $t('map.allDates') }}</button>
         <button class="filter-reset" @click="resetFilters">{{ $t('map.resetFilter') }}</button>
       </div>
     </div>
@@ -95,6 +96,23 @@
             >
               {{ edition.edition_label || new Date(edition.start_date).getFullYear() }}
             </button>
+          </div>
+
+          <div v-if="windowItem.data.hotelStats?.hotels?.length" class="hotel-stats">
+            <div class="hotel-stats-head">
+              <span class="section-label">{{ $t('hotel.distribution') }}</span>
+              <strong>{{ windowItem.data.hotelStats.total }}</strong>
+            </div>
+            <div class="hotel-stats-body">
+              <div class="hotel-pie" :style="{ background: hotelPieBackground(windowItem.data.hotelStats.hotels) }"></div>
+              <div class="hotel-legend">
+                <div v-for="hotel in windowItem.data.hotelStats.hotels" :key="`${hotel.name}-${hotel.address}`" class="hotel-legend-item">
+                  <span class="hotel-legend-dot" :style="{ background: hotel.color }"></span>
+                  <span class="hotel-legend-name">{{ hotel.name }}</span>
+                  <span class="hotel-legend-count">{{ hotel.count }} · {{ hotel.percent }}%</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="divider"></div>
@@ -325,6 +343,11 @@ function resetFilters() {
   Object.assign(mapFilters, defaultFilters())
 }
 
+function showAllDates() {
+  mapFilters.from = ''
+  mapFilters.to = ''
+}
+
 function parseDateInput(value, fallback) {
   const source = value || fallback
   const date = new Date(`${source}T00:00:00`)
@@ -396,18 +419,42 @@ async function openConWindow(con, sourceWindow = null) {
   const anchor = sourceWindow || (map && con.latitude && con.longitude
     ? map.latLngToContainerPoint([Number(con.latitude), Number(con.longitude)])
     : null)
-  const windowItem = upsertWindow('con', { ...con, attendees: con.Users || [] }, anchor)
+  let windowItem
+
+  if (sourceWindow?.type === 'con') {
+    const nextId = `con:${con.id}`
+    windows.value = windows.value.filter(item => item === sourceWindow || item.id !== nextId)
+    windowItem = sourceWindow
+    Object.assign(windowItem, {
+      id: nextId,
+      type: 'con',
+      title: con.name,
+      data: { ...con, attendees: con.Users || [], hotelStats: { total: 0, hotels: [] } },
+      color: con.theme_color || '#6C63FF',
+      z: ++windowZ,
+      loading: false,
+    })
+  } else {
+    windowItem = upsertWindow('con', { ...con, attendees: con.Users || [], hotelStats: { total: 0, hotels: [] } }, anchor)
+  }
 
   try {
-    const [attendeeResult, seriesResult] = await Promise.all([
+    const [attendeeResult, seriesResult, hotelStatsResult] = await Promise.all([
       consStore.fetchAttendees(con.id),
       con.series_key ? api.get(`/cons/series/${encodeURIComponent(con.series_key)}`).catch(() => null) : Promise.resolve(null),
+      fetchConHotelStats(con.id).catch(() => ({ total: 0, hotels: [] })),
     ])
     windowItem.data.attendees = attendeeResult.attendees || []
     windowItem.data.series = seriesResult?.data?.cons || []
+    windowItem.data.hotelStats = hotelStatsResult || { total: 0, hotels: [] }
   } catch (error) {
     windowItem.data.attendees = windowItem.data.attendees || []
   }
+}
+
+async function fetchConHotelStats(conId) {
+  const res = await api.get(`/cons/${conId}/hotel-stats`)
+  return res.data
 }
 
 async function openUserWindow(user, sourceWindow = null) {
@@ -438,6 +485,7 @@ async function toggleAttendance(windowItem) {
 
     setMyAttendance(conId, shouldAttend)
     await syncConAttendees(conId)
+    await syncConHotelStats(conId)
     renderMarkers()
     await refreshCurrentUserTrajectory()
   } catch (error) {
@@ -471,6 +519,27 @@ async function syncConAttendees(conId) {
   })
 
   return attendees
+}
+
+async function syncConHotelStats(conId) {
+  try {
+    const hotelStats = await fetchConHotelStats(conId)
+    windows.value.forEach(windowItem => {
+      if (windowItem.type !== 'con' || windowItem.data.id !== conId) return
+      windowItem.data.hotelStats = hotelStats
+    })
+    return hotelStats
+  } catch (error) {
+    return null
+  }
+}
+
+function handleAttendanceUpdated(event) {
+  const conId = event.detail?.conId
+  if (!conId) return
+
+  syncConAttendees(conId)
+  syncConHotelStats(conId)
 }
 
 function currentUserPatch() {
@@ -695,9 +764,23 @@ function markerClusterOffset(index, total) {
   const row = Math.floor(index / columns)
 
   return {
-    x: (column - (columns - 1) / 2) * 52,
-    y: (row - (rows - 1) / 2) * 42,
+    x: (column - (columns - 1) / 2) * 46,
+    y: (row - (rows - 1) / 2) * 34,
   }
+}
+
+function hotelPieBackground(hotels = []) {
+  const total = hotels.reduce((sum, hotel) => sum + hotel.count, 0)
+  if (!total) return 'var(--bg-secondary)'
+
+  let cursor = 0
+  const segments = hotels.map(hotel => {
+    const start = cursor
+    cursor += (hotel.count / total) * 100
+    return `${hotel.color} ${start}% ${cursor}%`
+  })
+
+  return `conic-gradient(${segments.join(', ')})`
 }
 
 function offsetLatLng(latLng, offset) {
@@ -1049,6 +1132,7 @@ function fadeOutTrajectories() {
 onMounted(async () => {
   initMap()
   window.addEventListener('pawport-profile-updated', handleProfileUpdated)
+  window.addEventListener('pawport-attendance-updated', handleAttendanceUpdated)
   await nextTick()
   await refreshMapData()
 })
@@ -1058,6 +1142,7 @@ onUnmounted(() => {
   clearTimeout(trajectoryHideTimer)
   clearTimeout(currentUserTrajectoryTimer)
   window.removeEventListener('pawport-profile-updated', handleProfileUpdated)
+  window.removeEventListener('pawport-attendance-updated', handleAttendanceUpdated)
   if (map) {
     map.remove()
     map = null
@@ -1364,8 +1449,9 @@ watch(
 
 .con-avatar {
   width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  height: 42px;
+  border-radius: 13px;
+  border: 2px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
 .con-avatar img,
@@ -1432,6 +1518,76 @@ watch(
   font-size: 0.78em;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.hotel-stats {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+
+.hotel-stats-head,
+.hotel-stats-body,
+.hotel-legend-item {
+  display: flex;
+  align-items: center;
+}
+
+.hotel-stats-head {
+  justify-content: space-between;
+  margin-bottom: 10px;
+
+  strong {
+    color: var(--text-secondary);
+    font-size: 0.82em;
+  }
+}
+
+.hotel-stats-body {
+  gap: 12px;
+}
+
+.hotel-pie {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--bg-card) 88%, transparent);
+  flex: 0 0 auto;
+}
+
+.hotel-legend {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.hotel-legend-item {
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.78em;
+}
+
+.hotel-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.hotel-legend-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hotel-legend-count {
+  flex: 0 0 auto;
+  font-weight: 700;
 }
 
 .divider {

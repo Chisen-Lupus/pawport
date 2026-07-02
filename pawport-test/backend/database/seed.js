@@ -44,6 +44,33 @@ async function seed() {
         longitude: 121.4998,
         is_test: true,
       },
+      {
+        name: '测试会场',
+        address: '北京市朝阳区',
+        city: '北京',
+        country: '中国',
+        latitude: 39.9042,
+        longitude: 116.4074,
+        is_test: true,
+      },
+      {
+        name: '北京星港酒店',
+        address: '北京市朝阳区星港路88号',
+        city: '北京',
+        country: '中国',
+        latitude: 39.9142,
+        longitude: 116.4174,
+        is_test: true,
+      },
+      {
+        name: '朝阳会议酒店',
+        address: '北京市朝阳区会议中心路12号',
+        city: '北京',
+        country: '中国',
+        latitude: 39.8942,
+        longitude: 116.3974,
+        is_test: true,
+      },
     ]);
     console.log(`  ✅ Created ${hotels.length} test hotels`);
 
@@ -207,6 +234,7 @@ async function seed() {
         bio: '一只喜欢旅行的火狐',
         show_on_homepage: true,
         show_con_history: true,
+        show_hotel_info: true,
         is_test: true,
         role: 'user',
       },
@@ -219,6 +247,7 @@ async function seed() {
         bio: '兽展爱好者，已参加20+场展',
         show_on_homepage: true,
         show_con_history: true,
+        show_hotel_info: true,
         is_test: true,
         role: 'user',
       },
@@ -231,6 +260,7 @@ async function seed() {
         bio: '新人，第一次参展！',
         show_on_homepage: true,
         show_con_history: true,
+        show_hotel_info: true,
         is_test: true,
         role: 'user',
       },
@@ -243,6 +273,7 @@ async function seed() {
         bio: '喜欢猫猫的小紫',
         show_on_homepage: true,
         show_con_history: false,
+        show_hotel_info: true,
         is_test: true,
         role: 'user',
       },
@@ -270,6 +301,7 @@ async function seed() {
           bio: '当前展头像列表测试用户',
           show_on_homepage: true,
           show_con_history: false,
+          show_hotel_info: true,
           is_test: true,
           role: 'user',
         };
@@ -298,7 +330,7 @@ async function seed() {
       { user_id: users[3].id, con_id: cons[1].id, comment: '和朋友一起去的~', rating: 4, visit_order: 1 },
     ]);
 
-    await UserCon.bulkCreate(
+    const extraUserCons = await UserCon.bulkCreate(
       extraUsers.map(user => ({
         user_id: user.id,
         con_id: cons[4].id,
@@ -312,8 +344,17 @@ async function seed() {
     await UserConHotel.bulkCreate([
       { user_con_id: userCons[0].id, hotel_id: hotels[0].id, check_in: '2024-03-14', check_out: '2024-03-18' },
       { user_con_id: userCons[1].id, hotel_id: hotels[1].id, check_in: '2024-07-19', check_out: '2024-07-23' },
+      { user_con_id: userCons[2].id, hotel_id: hotels[4].id, check_in: '2026-07-01', check_out: '2026-07-03' },
       { user_con_id: userCons[4].id, hotel_id: hotels[2].id, check_in: '2024-12-04', check_out: '2024-12-09' },
       { user_con_id: userCons[5].id, hotel_id: hotels[3].id, check_in: '2024-09-30', check_out: '2024-10-04' },
+      { user_con_id: userCons[6].id, hotel_id: hotels[5].id, check_in: '2026-07-01', check_out: '2026-07-04' },
+      { user_con_id: userCons[8].id, hotel_id: hotels[6].id, check_in: '2026-07-02', check_out: '2026-07-03' },
+      ...extraUserCons.map((userCon, index) => ({
+        user_con_id: userCon.id,
+        hotel_id: hotels[4 + (index % 3)].id,
+        check_in: '2026-07-01',
+        check_out: '2026-07-03',
+      })),
     ]);
     console.log('  ✅ Created hotel assignments');
 

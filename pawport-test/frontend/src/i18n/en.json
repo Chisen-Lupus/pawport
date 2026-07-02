@@ -30,6 +30,7 @@
     "dateTo": "Date To",
     "previousMonth": "-1 mo",
     "nextMonth": "+1 mo",
+    "allDates": "All",
     "resetFilter": "Reset"
   },
   "con": {
@@ -47,7 +48,7 @@
     "hotel": "Hotel",
     "addHotel": "Add Hotel",
     "submitCon": "Submit New Con",
-    "website": "Official Website",
+    "website": "Info Source",
     "theme": "Theme",
     "avatar": "Con Avatar",
     "uploadAvatar": "Upload Con Avatar",
@@ -61,7 +62,11 @@
   },
   "hotel": {
     "name": "Hotel Name",
-    "address": "Address"
+    "address": "Address",
+    "editHotels": "Edit Hotels",
+    "useVenue": "Use venue as hotel",
+    "saveHotels": "Save Hotels",
+    "distribution": "Hotel Distribution"
   },
   "user": {
     "profile": "Profile",
@@ -74,8 +79,8 @@
     "themeColor": "Theme Color",
     "conHistory": "Con History",
     "conHistoryHint": "You can also open a convention on the map and add it to your history from that window.",
-    "showOnHomepage": "Show on Homepage",
-    "showHistory": "Show Con History",
+    "showOnHomepage": "Public Attendance Record",
+    "showHistory": "Show Trajectory on Homepage",
     "showHotel": "Show Hotel Info",
     "save": "Save",
     "saved": "Saved",

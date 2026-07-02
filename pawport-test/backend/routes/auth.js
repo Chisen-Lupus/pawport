@@ -91,6 +91,9 @@ router.post('/register', [
         avatar_url: user.avatar_url,
         theme_color: user.theme_color,
         role: user.role,
+        show_on_homepage: user.show_on_homepage,
+        show_con_history: user.show_con_history,
+        show_hotel_info: user.show_hotel_info,
       },
     });
   } catch (error) {
@@ -144,6 +147,7 @@ router.post('/login', [
         role: user.role,
         show_on_homepage: user.show_on_homepage,
         show_con_history: user.show_con_history,
+        show_hotel_info: user.show_hotel_info,
       },
     });
   } catch (error) {
@@ -191,6 +195,13 @@ router.put('/profile', authenticate, async (req, res) => {
         updates[field] = req.body[field];
       }
     });
+
+    const nextShowOnHomepage = updates.show_on_homepage !== undefined
+      ? updates.show_on_homepage
+      : req.user.show_on_homepage;
+    if (!nextShowOnHomepage) {
+      updates.show_con_history = false;
+    }
 
     await req.user.update(updates);
     res.json({ message: 'Profile updated', user: req.user });
