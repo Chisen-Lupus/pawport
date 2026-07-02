@@ -11,10 +11,6 @@
         <span class="control-icon">×</span>
         <span class="control-label">{{ $t('map.clearWindows') }}</span>
       </button>
-      <button class="control-btn" @click="toggleActiveCallouts" :class="{ active: showActiveCallouts }">
-        <span class="control-icon">▦</span>
-        <span class="control-label">{{ showActiveCallouts ? $t('map.hideActiveCallouts') : $t('map.showActiveCallouts') }}</span>
-      </button>
       <div class="filter-controls">
         <select v-model="mapFilters.region" :aria-label="$t('map.region')">
           <option value="all">{{ $t('map.regionAll') }}</option>
@@ -28,10 +24,17 @@
       </div>
     </div>
 
-    <div class="active-cons-badge" v-if="activeCons.length > 0" @click="toggleActiveCallouts">
+    <button
+      class="active-cons-badge"
+      v-if="activeCons.length > 0"
+      :class="{ active: showActiveCallouts }"
+      :aria-pressed="showActiveCallouts"
+      :aria-label="`${activeCons.length} ${$t('map.activeCon')}`"
+      @click="toggleActiveCallouts"
+    >
       <div class="badge-dot"></div>
       <span>{{ activeCons.length }} {{ $t('map.activeCon') }}</span>
-    </div>
+    </button>
 
     <TransitionGroup name="window-stack" tag="div" class="window-layer">
       <section
@@ -563,8 +566,8 @@ function markerHtml(con, color, borderColor, size, isMine) {
   const width = Math.round(size * 1.38)
   const height = size
   const image = con.avatar_url
-    ? `<img src="${escapeHtml(con.avatar_url)}" alt="" />`
-    : `<span>${label}</span>`
+    ? `<span class="marker-media"><img src="${escapeHtml(con.avatar_url)}" alt="" /></span>`
+    : `<span class="marker-label">${label}</span>`
   return `
     <div class="marker-wrapper ${con.isActive ? 'active' : ''} ${isMine ? 'mine' : ''}" style="width:${width + 18}px;height:${height + 18}px;">
       ${con.isActive ? `<div class="marker-pulse" style="border-color:${color}"></div>` : ''}
@@ -619,21 +622,11 @@ function renderActiveCallout(con) {
   const more = attendees.length > 19 ? `<span class="callout-avatar more">+${attendees.length - 19}</span>` : ''
   const icon = L.divIcon({
     className: 'active-callout',
-    html: `<div class="active-callout-box"><button class="callout-close" title="${escapeHtml(themeStore.locale === 'zh' ? '关闭' : 'Close')}">×</button>${avatars}${more}</div>`,
+    html: `<div class="active-callout-box">${avatars}${more}</div>`,
     iconSize: [192, 184],
     iconAnchor: [24, 172],
   })
   const marker = L.marker([Number(con.latitude), Number(con.longitude)], { icon, interactive: true })
-  marker.on('add', () => {
-    const button = marker.getElement()?.querySelector('.callout-close')
-    if (!button) return
-    L.DomEvent.disableClickPropagation(button)
-    button.addEventListener('click', event => {
-      L.DomEvent.stop(event)
-      showActiveCallouts.value = false
-      renderMarkers()
-    })
-  })
   marker.on('click', () => openConWindow(con))
   activeCalloutsLayer.addLayer(marker)
 }
@@ -1101,6 +1094,7 @@ watch(
   top: 16px;
   right: 16px;
   z-index: 800;
+  appearance: none;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1109,6 +1103,8 @@ watch(
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow);
+  color: var(--text);
+  font-family: inherit;
   font-size: 0.85em;
   font-weight: 600;
   backdrop-filter: blur(14px);
@@ -1118,6 +1114,11 @@ watch(
 
 .active-cons-badge:hover {
   transform: translateY(-1px);
+  border-color: var(--user-primary, var(--primary));
+}
+
+.active-cons-badge.active {
+  color: var(--user-primary, var(--primary));
   border-color: var(--user-primary, var(--primary));
 }
 
@@ -1517,6 +1518,9 @@ watch(
 }
 
 :global(.marker-card) {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
   border-radius: 13px;
   border: 3px solid;
   display: flex;
@@ -1535,11 +1539,28 @@ watch(
   border-radius: 18px;
 }
 
-:global(.marker-card img) {
+:global(.marker-media) {
+  position: absolute;
+  inset: 3px;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: 9px;
+}
+
+:global(.marker-card:hover .marker-media) {
+  border-radius: 14px;
+}
+
+:global(.marker-media img) {
+  display: block;
   width: 100%;
   height: 100%;
-  border-radius: 10px;
   object-fit: cover;
+}
+
+:global(.marker-label) {
+  position: relative;
+  z-index: 1;
 }
 
 :global(.active-callout) {
@@ -1579,25 +1600,6 @@ watch(
 
 :global(.dark .active-callout-box) {
   background: rgba(30, 41, 59, 0.88);
-}
-
-:global(.callout-close) {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(100, 116, 139, 0.22);
-  color: inherit;
-  cursor: pointer;
-  font-size: 15px;
-  line-height: 1;
-}
-
-:global(.callout-close:hover) {
-  background: rgba(100, 116, 139, 0.36);
 }
 
 :global(.callout-avatar) {
