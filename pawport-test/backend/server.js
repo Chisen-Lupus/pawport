@@ -84,6 +84,13 @@ async function start() {
         syncFCC();
       });
       console.log('✅ FCC sync scheduled (daily at 3:00 AM)');
+
+      setTimeout(() => {
+        console.log('🔄 Running initial FCC sync...');
+        syncFCC().catch(error => {
+          console.error('⚠️ Initial FCC sync failed:', error.message);
+        });
+      }, 1000);
     }
     
     const host = appConfig.env === 'development' ? appConfig.local.host : '0.0.0.0';

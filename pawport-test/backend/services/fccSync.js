@@ -12,6 +12,54 @@ const FCC_CALENDAR_PATH = appConfig.fcc.calendarPath || '/event/recent';
 const FCC_DETAIL_PATH = appConfig.fcc.detailPath || '/event';
 const FCC_TOKEN = secretsConfig.fcc.token;
 
+const CITY_COORDINATES = {
+  北京: [39.9042, 116.4074],
+  上海: [31.2304, 121.4737],
+  广州: [23.1291, 113.2644],
+  深圳: [22.5431, 114.0579],
+  成都: [30.5728, 104.0668],
+  武汉: [30.5928, 114.3055],
+  佛山: [23.0215, 113.1214],
+  淄博: [36.8135, 118.055],
+  绵阳: [31.4675, 104.6796],
+  徐州: [34.2044, 117.2858],
+  咸宁: [29.8413, 114.3225],
+  杭州: [30.2741, 120.1551],
+  南京: [32.0603, 118.7969],
+  苏州: [31.2989, 120.5853],
+  天津: [39.3434, 117.3616],
+  重庆: [29.563, 106.5516],
+  西安: [34.3416, 108.9398],
+  郑州: [34.7466, 113.6254],
+  长沙: [28.2282, 112.9388],
+  厦门: [24.4798, 118.0894],
+  福州: [26.0745, 119.2965],
+  青岛: [36.0671, 120.3826],
+  济南: [36.6512, 117.1201],
+  合肥: [31.8206, 117.2272],
+  南昌: [28.682, 115.8579],
+  南宁: [22.817, 108.3669],
+  昆明: [25.0389, 102.7183],
+  贵阳: [26.647, 106.6302],
+  沈阳: [41.8057, 123.4315],
+  大连: [38.914, 121.6147],
+  哈尔滨: [45.8038, 126.5349],
+  长春: [43.8171, 125.3235],
+  石家庄: [38.0428, 114.5149],
+  太原: [37.8706, 112.5489],
+  呼和浩特: [40.8426, 111.7492],
+  乌鲁木齐: [43.8256, 87.6168],
+  兰州: [36.0611, 103.8343],
+  银川: [38.4872, 106.2309],
+  西宁: [36.6171, 101.7782],
+  拉萨: [29.652, 91.1721],
+  海口: [20.044, 110.1999],
+  三亚: [18.2528, 109.512],
+  香港: [22.3193, 114.1694],
+  澳门: [22.1987, 113.5439],
+  台北: [25.033, 121.5654],
+};
+
 function buildSeriesKey(event) {
   const source = event.organization?.slug
     || event.organization?.name
@@ -92,6 +140,38 @@ function numericValue(...values) {
   return Number.isFinite(number) ? number : null;
 }
 
+function normalizePlace(value = '') {
+  return String(value)
+    .replace(/\s+/g, '')
+    .replace(/[省市区县]/g, '')
+    .toLowerCase();
+}
+
+function fallbackCoordinates(event) {
+  const candidates = [
+    event.city,
+    event.region,
+    event.address,
+    event.fullAddress,
+    event.venue,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const normalizedCandidate = normalizePlace(candidate);
+    const exact = Object.entries(CITY_COORDINATES).find(([city]) => (
+      normalizePlace(city) === normalizedCandidate
+    ));
+    if (exact) return { latitude: exact[1][0], longitude: exact[1][1], precision: 'city' };
+
+    const included = Object.entries(CITY_COORDINATES).find(([city]) => (
+      normalizedCandidate.includes(normalizePlace(city))
+    ));
+    if (included) return { latitude: included[1][0], longitude: included[1][1], precision: 'city' };
+  }
+
+  return null;
+}
+
 function buildDisplayName(event) {
   const organizationName = event.organization?.name;
   const eventName = firstValue(event.name, event.title);
@@ -130,6 +210,11 @@ function mapEventToConData(listEvent, detailEvent = null) {
   const endDate = dateOnly(firstValue(event.endDate, event.end_date, event.eventEndAt)) || startDate;
   const thumbnail = firstValue(event.thumbnail, event.posterUrl, event.poster, event.cover);
   const organizationLogo = event.organization?.logoUrl;
+  const exactLatitude = numericValue(event.latitude, event.lat, event.location?.latitude, event.location?.lat, event.geo?.lat);
+  const exactLongitude = numericValue(event.longitude, event.lng, event.location?.longitude, event.location?.lng, event.geo?.lng);
+  const fallback = exactLatitude === null || exactLongitude === null ? fallbackCoordinates(event) : null;
+  const latitude = exactLatitude ?? fallback?.latitude ?? null;
+  const longitude = exactLongitude ?? fallback?.longitude ?? null;
 
   return {
     name: displayName,
@@ -144,8 +229,8 @@ function mapEventToConData(listEvent, detailEvent = null) {
     city: firstValue(event.city, event.region),
     country: firstValue(event.country, '中国'),
     address: buildAddress(event),
-    latitude: numericValue(event.latitude, event.lat, event.location?.latitude, event.location?.lat, event.geo?.lat),
-    longitude: numericValue(event.longitude, event.lng, event.location?.longitude, event.location?.lng, event.geo?.lng),
+    latitude,
+    longitude,
     poster_url: thumbnail,
     avatar_url: firstValue(thumbnail, event.avatarUrl, event.logo, organizationLogo),
     theme: firstValue(event.theme, event.slogan, organizationName && event.name ? event.name : null),
@@ -159,6 +244,7 @@ function mapEventToConData(listEvent, detailEvent = null) {
       source: 'fcc',
       sourceUrl: event.url || null,
       fccSyncedAt: new Date().toISOString(),
+      locationPrecision: exactLatitude !== null && exactLongitude !== null ? 'exact' : fallback?.precision || 'unknown',
       scale: event.scale || null,
       eventStatus: event.status || null,
       organization: event.organization || null,

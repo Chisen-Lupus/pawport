@@ -132,6 +132,7 @@ Automatically syncs convention data from the FurryConsCN open calendar endpoint 
 - Calendar list: `GET /open/event/recent?keepOld=true`
 - Optional detail fill: `GET /open/event/:id`
 - Auth header: `Authorization: <token>` 
+- If FCC does not return venue coordinates, PawPort falls back to city-level coordinates and records `extra_fields.locationPrecision = "city"`.
 
 Manual sync: `./deploy.sh sync-fcc`
 
