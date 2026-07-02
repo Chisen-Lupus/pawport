@@ -121,6 +121,7 @@
     "delete": "Delete",
     "search": "Search",
     "noResults": "No results",
-    "close": "Close"
+    "close": "Close",
+    "optional": "Optional"
   }
 }

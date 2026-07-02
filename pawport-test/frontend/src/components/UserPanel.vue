@@ -53,14 +53,6 @@
             <span class="switch-track"><span class="switch-thumb"></span></span>
           </label>
         </div>
-        
-        <button class="btn btn-primary btn-full" @click="saveProfile" :disabled="saving">
-          {{ saving ? $t('common.loading') : (saved ? $t('user.saved') : $t('user.save')) }}
-        </button>
-
-        <button class="btn btn-outline btn-full export-btn" @click="exportCurrentUser">
-          {{ $t('user.exportProfile') }}
-        </button>
       </section>
       
       <!-- Con History Section -->
@@ -258,13 +250,24 @@
               <button class="link-btn" @click="addHotelRow">+ {{ $t('con.addHotel') }}</button>
             </div>
             <div v-for="(hotel, index) in attendanceForm.hotels" :key="index" class="hotel-row">
-              <input v-model="hotel.name" :placeholder="$t('hotel.name')" />
-              <input v-model="hotel.address" :placeholder="$t('hotel.address')" />
-              <div class="form-row">
+              <label class="hotel-row-field">
+                <span>{{ $t('hotel.name') }}</span>
+                <input v-model="hotel.name" :placeholder="$t('hotel.name')" />
+              </label>
+              <label class="hotel-row-field">
+                <span>
+                  {{ $t('hotel.address') }}
+                  <span class="field-optional">({{ $t('common.optional') }})</span>
+                </span>
+                <input v-model="hotel.address" :placeholder="$t('hotel.addressOptionalPlaceholder')" />
+              </label>
+              <div class="hotel-date-row">
                 <input v-model="hotel.check_in" type="date" />
                 <input v-model="hotel.check_out" type="date" />
+                <button class="remove-hotel" type="button" @click="removeHotelRow(index)" :aria-label="$t('common.delete')">
+                  ×
+                </button>
               </div>
-              <button class="remove-hotel" @click="removeHotelRow(index)">×</button>
             </div>
           </div>
 
@@ -363,6 +366,16 @@
           {{ $t('common.confirm') }}
         </button>
       </div>
+
+      <section class="panel-section profile-actions">
+        <button class="btn btn-primary btn-full" @click="saveProfile" :disabled="saving">
+          {{ saving ? $t('common.loading') : (saved ? $t('user.saved') : $t('user.save')) }}
+        </button>
+
+        <button class="btn btn-outline btn-full export-btn" @click="exportCurrentUser">
+          {{ $t('user.exportProfile') }}
+        </button>
+      </section>
       
       <!-- Logout -->
       <section class="panel-section">
@@ -1472,8 +1485,7 @@ watch(() => form.show_on_homepage, value => {
 }
 
 .selected-con button,
-.link-btn,
-.remove-hotel {
+.link-btn {
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -1503,13 +1515,66 @@ watch(() => form.show_on_homepage, value => {
   margin-bottom: 8px;
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
-  position: relative;
+
+  input {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9em;
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+
+    &:focus {
+      outline: none;
+      border-color: var(--user-primary, var(--primary));
+    }
+  }
+}
+
+.hotel-row-field {
+  display: grid;
+  gap: 4px;
+
+  > span {
+    color: var(--text-secondary);
+    font-size: 0.78em;
+    font-weight: 700;
+  }
+}
+
+.hotel-date-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .remove-hotel {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.05em;
+  line-height: 1;
+  transition: border-color var(--transition), color var(--transition), background var(--transition), transform var(--transition);
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: #E53E3E;
+    color: #E53E3E;
+    background: color-mix(in srgb, #E53E3E 10%, var(--bg-card));
+  }
 }
 
 .divider {
@@ -1526,6 +1591,11 @@ watch(() => form.show_on_homepage, value => {
 }
 
 .export-btn {
-  margin-top: 12px;
+  margin-top: 0;
+}
+
+.profile-actions {
+  display: grid;
+  gap: 12px;
 }
 </style>
