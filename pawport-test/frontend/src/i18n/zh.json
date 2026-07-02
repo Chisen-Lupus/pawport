@@ -83,8 +83,8 @@
   },
   "user": {
     "profile": "个人资料",
-    "userId": "用户 ID",
-    "idReadonly": "系统生成，不可修改",
+    "loginId": "登录名",
+    "loginIdReadonly": "注册后不可修改",
     "username": "用户名",
     "displayName": "显示名称",
     "email": "邮箱",

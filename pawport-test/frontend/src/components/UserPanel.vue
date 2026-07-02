@@ -20,9 +20,9 @@
         </div>
 
         <div class="profile-id-card">
-          <span>{{ $t('user.userId') }}</span>
-          <code>{{ authStore.user.id }}</code>
-          <small>{{ $t('user.idReadonly') }}</small>
+          <span>{{ $t('user.loginId') }}</span>
+          <code>{{ authStore.user.username }}</code>
+          <small>{{ $t('user.loginIdReadonly') }}</small>
         </div>
         
         <div class="form-group">

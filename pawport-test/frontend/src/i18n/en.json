@@ -83,8 +83,8 @@
   },
   "user": {
     "profile": "Profile",
-    "userId": "User ID",
-    "idReadonly": "System generated and cannot be changed",
+    "loginId": "Login ID",
+    "loginIdReadonly": "Cannot be changed after registration",
     "username": "Username",
     "displayName": "Display Name",
     "email": "Email",
