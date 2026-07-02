@@ -18,6 +18,12 @@
             {{ uploadingAvatar ? $t('common.loading') : $t('user.uploadAvatar') }}
           </label>
         </div>
+
+        <div class="profile-id-card">
+          <span>{{ $t('user.userId') }}</span>
+          <code>{{ authStore.user.id }}</code>
+          <small>{{ $t('user.idReadonly') }}</small>
+        </div>
         
         <div class="form-group">
           <label>{{ $t('user.displayName') }}</label>
@@ -367,6 +373,47 @@
         </button>
       </div>
 
+      <section class="panel-section security-section">
+        <button
+          type="button"
+          class="accordion-toggle"
+          :aria-expanded="showPasswordEditor"
+          @click="showPasswordEditor = !showPasswordEditor"
+        >
+          <span>
+            <strong>{{ $t('auth.changePassword') }}</strong>
+            <small>{{ $t('auth.changePasswordHint') }}</small>
+          </span>
+          <span class="accordion-icon" :class="{ open: showPasswordEditor }">⌄</span>
+        </button>
+
+        <transition name="accordion">
+          <form v-if="showPasswordEditor" class="password-form" @submit.prevent="changePassword">
+            <div class="form-group">
+              <label>{{ $t('auth.currentPassword') }}</label>
+              <input v-model="passwordForm.current_password" type="password" autocomplete="current-password" required />
+            </div>
+
+            <div class="form-group">
+              <label>{{ $t('auth.newPassword') }}</label>
+              <input v-model="passwordForm.new_password" type="password" autocomplete="new-password" minlength="6" required />
+            </div>
+
+            <div class="form-group">
+              <label>{{ $t('auth.confirmNewPassword') }}</label>
+              <input v-model="passwordForm.confirm_password" type="password" autocomplete="new-password" minlength="6" required />
+            </div>
+
+            <p v-if="passwordError" class="form-message error">{{ passwordError }}</p>
+            <p v-else-if="passwordSaved" class="form-message success">{{ $t('auth.passwordUpdated') }}</p>
+
+            <button class="btn btn-primary btn-full" type="submit" :disabled="passwordSaving">
+              {{ passwordSaving ? $t('common.loading') : $t('auth.updatePassword') }}
+            </button>
+          </form>
+        </transition>
+      </section>
+
       <section class="panel-section profile-actions">
         <button class="btn btn-primary btn-full" @click="saveProfile" :disabled="saving">
           {{ saving ? $t('common.loading') : (saved ? $t('user.saved') : $t('user.save')) }}
@@ -390,17 +437,23 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useConsStore } from '@/stores/cons'
 import api from '@/utils/api'
 
 const emit = defineEmits(['close'])
 const router = useRouter()
+const { t } = useI18n()
 const authStore = useAuthStore()
 const consStore = useConsStore()
 
 const saving = ref(false)
 const saved = ref(false)
+const showPasswordEditor = ref(false)
+const passwordSaving = ref(false)
+const passwordSaved = ref(false)
+const passwordError = ref('')
 const showAddCon = ref(false)
 const showSubmitCon = ref(false)
 const searchQuery = ref('')
@@ -434,6 +487,12 @@ const attendanceForm = reactive({
   comment: '',
   rating: null,
   hotels: [],
+})
+
+const passwordForm = reactive({
+  current_password: '',
+  new_password: '',
+  confirm_password: '',
 })
 
 async function saveProfile() {
@@ -472,6 +531,52 @@ async function uploadUserAvatar(event) {
   } finally {
     uploadingAvatar.value = false
     event.target.value = ''
+  }
+}
+
+function resetPasswordForm() {
+  passwordForm.current_password = ''
+  passwordForm.new_password = ''
+  passwordForm.confirm_password = ''
+}
+
+function passwordErrorFromCode(code) {
+  const errorMap = {
+    INVALID_CURRENT_PASSWORD: 'auth.currentPasswordIncorrect',
+    PASSWORD_UNAVAILABLE: 'auth.passwordLoginUnavailable',
+    INVALID_PASSWORD_INPUT: 'auth.passwordTooShort',
+    PASSWORD_UPDATE_FAILED: 'auth.passwordUpdateFailed',
+  }
+  return t(errorMap[code] || 'auth.passwordUpdateFailed')
+}
+
+async function changePassword() {
+  passwordError.value = ''
+  passwordSaved.value = false
+
+  if (passwordForm.new_password.length < 6) {
+    passwordError.value = t('auth.passwordTooShort')
+    return
+  }
+
+  if (passwordForm.new_password !== passwordForm.confirm_password) {
+    passwordError.value = t('auth.passwordMismatch')
+    return
+  }
+
+  passwordSaving.value = true
+  try {
+    await authStore.changePassword({
+      current_password: passwordForm.current_password,
+      new_password: passwordForm.new_password,
+    })
+    resetPasswordForm()
+    passwordSaved.value = true
+    setTimeout(() => { passwordSaved.value = false }, 2500)
+  } catch (error) {
+    passwordError.value = passwordErrorFromCode(error.response?.data?.code)
+  } finally {
+    passwordSaving.value = false
   }
 }
 
@@ -1088,6 +1193,34 @@ watch(() => form.show_on_homepage, value => {
   }
 }
 
+.profile-id-card {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+
+  span {
+    color: var(--text-secondary);
+    font-size: 0.78em;
+    font-weight: 700;
+  }
+
+  code {
+    color: var(--text);
+    font: inherit;
+    font-size: 0.82em;
+    overflow-wrap: anywhere;
+  }
+
+  small {
+    color: var(--text-secondary);
+    font-size: 0.74em;
+  }
+}
+
 .form-group {
   margin-bottom: 12px;
   
@@ -1415,6 +1548,93 @@ watch(() => form.show_on_homepage, value => {
   color: var(--text-secondary);
   font-size: 0.84em;
   font-weight: 400;
+}
+
+.security-section {
+  display: grid;
+  gap: 12px;
+}
+
+.accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition);
+
+  &:hover {
+    border-color: var(--user-primary, var(--primary));
+  }
+
+  strong {
+    display: block;
+    font-size: 0.92em;
+  }
+
+  small {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-secondary);
+    font-size: 0.76em;
+    line-height: 1.35;
+  }
+}
+
+.accordion-icon {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  transition: transform var(--transition);
+
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+.password-form {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+  border: 1px solid var(--border);
+
+  .form-group {
+    margin-bottom: 0;
+  }
+}
+
+.form-message {
+  margin: 0;
+  font-size: 0.82em;
+  line-height: 1.4;
+
+  &.error {
+    color: #E53E3E;
+  }
+
+  &.success {
+    color: #16A34A;
+  }
+}
+
+.accordion-enter-active,
+.accordion-leave-active {
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.accordion-enter-from,
+.accordion-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 .add-con-modal, .submit-con-form {

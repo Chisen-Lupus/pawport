@@ -211,6 +211,46 @@ router.put('/profile', authenticate, async (req, res) => {
   }
 });
 
+// PUT /api/auth/password - Change current user's password
+router.put('/password', authenticate, [
+  body('current_password').notEmpty(),
+  body('new_password').isLength({ min: 6 }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Invalid password input',
+        code: 'INVALID_PASSWORD_INPUT',
+        errors: errors.array(),
+      });
+    }
+
+    if (!req.user.password_hash) {
+      return res.status(400).json({
+        error: 'Password login is not available for this account',
+        code: 'PASSWORD_UNAVAILABLE',
+      });
+    }
+
+    const { current_password, new_password } = req.body;
+    const isValid = await bcrypt.compare(current_password, req.user.password_hash);
+    if (!isValid) {
+      return res.status(401).json({
+        error: 'Current password is incorrect',
+        code: 'INVALID_CURRENT_PASSWORD',
+      });
+    }
+
+    const password_hash = await bcrypt.hash(new_password, 10);
+    await req.user.update({ password_hash });
+    res.json({ message: 'Password updated' });
+  } catch (error) {
+    console.error('Password update error:', error);
+    res.status(500).json({ error: 'Password update failed', code: 'PASSWORD_UPDATE_FAILED' });
+  }
+});
+
 // POST /api/auth/avatar - Upload current user's avatar
 router.post('/avatar', authenticate, userAvatarUpload.single('avatar'), async (req, res) => {
   try {

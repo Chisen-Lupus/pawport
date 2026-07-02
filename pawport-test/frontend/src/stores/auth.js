@@ -42,6 +42,11 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = res.data.user
     return res.data
   }
+
+  async function changePassword(data) {
+    const res = await api.put('/auth/password', data)
+    return res.data
+  }
   
   function logout() {
     token.value = null
@@ -49,5 +54,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('pawport-token')
   }
   
-  return { user, token, isLoggedIn, themeColor, login, register, fetchProfile, updateProfile, logout }
+  return { user, token, isLoggedIn, themeColor, login, register, fetchProfile, updateProfile, changePassword, logout }
 })
