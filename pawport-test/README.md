@@ -129,10 +129,11 @@ features: {
 
 Automatically syncs convention data from the FurryConsCN open calendar endpoint used in `furrycons-api.ipynb`:
 
-- Calendar list: `GET /open/event/recent?keepOld=true`
+- Calendar list: `GET /open/event?eventStartAt=...&eventEndAt=...`
 - Optional detail fill: `GET /open/event/:id`
 - Auth header: `Authorization: <token>` 
 - If FCC does not return venue coordinates, PawPort falls back to city-level coordinates and records `extra_fields.locationPrecision = "city"`.
+- The default sync window covers `syncPastMonths` and `syncFutureMonths` from `config/site.config.js`, so the map date filter can show past FCC events already mirrored into the local database.
 
 Manual sync: `./deploy.sh sync-fcc`
 

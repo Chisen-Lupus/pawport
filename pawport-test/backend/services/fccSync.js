@@ -8,6 +8,7 @@ const secretsConfig = require('../../config/secrets.config');
 const { Con } = require('../database/init');
 
 const FCC_BASE_URL = String(appConfig.fcc.baseUrl || 'https://api.furrycons.cn/open').replace(/\/+$/, '');
+const FCC_LIST_PATH = appConfig.fcc.listPath || '/event';
 const FCC_CALENDAR_PATH = appConfig.fcc.calendarPath || '/event/recent';
 const FCC_DETAIL_PATH = appConfig.fcc.detailPath || '/event';
 const FCC_TOKEN = secretsConfig.fcc.token;
@@ -27,15 +28,29 @@ const CITY_COORDINATES = {
   杭州: [30.2741, 120.1551],
   南京: [32.0603, 118.7969],
   苏州: [31.2989, 120.5853],
+  宁波: [29.8683, 121.544],
+  台州: [28.6564, 121.4208],
+  东莞: [23.0207, 113.7518],
+  惠州: [23.1115, 114.4152],
+  温州: [27.9938, 120.6994],
+  常州: [31.8107, 119.9737],
   天津: [39.3434, 117.3616],
   重庆: [29.563, 106.5516],
   西安: [34.3416, 108.9398],
+  汉中: [33.0675, 107.0232],
+  洛阳: [34.6197, 112.454],
+  保定: [38.8737, 115.4646],
+  唐山: [39.6305, 118.1806],
+  淮安: [33.6104, 119.0153],
   郑州: [34.7466, 113.6254],
   长沙: [28.2282, 112.9388],
   厦门: [24.4798, 118.0894],
   福州: [26.0745, 119.2965],
   青岛: [36.0671, 120.3826],
   济南: [36.6512, 117.1201],
+  济宁: [35.4149, 116.5872],
+  滨州: [37.3835, 117.9707],
+  枣庄: [34.8105, 117.3238],
   合肥: [31.8206, 117.2272],
   南昌: [28.682, 115.8579],
   南宁: [22.817, 108.3669],
@@ -45,9 +60,12 @@ const CITY_COORDINATES = {
   大连: [38.914, 121.6147],
   哈尔滨: [45.8038, 126.5349],
   长春: [43.8171, 125.3235],
+  白山: [41.944, 126.4236],
+  延边: [42.8913, 129.5091],
   石家庄: [38.0428, 114.5149],
   太原: [37.8706, 112.5489],
   呼和浩特: [40.8426, 111.7492],
+  鄂尔多斯: [39.6086, 109.7816],
   乌鲁木齐: [43.8256, 87.6168],
   兰州: [36.0611, 103.8343],
   银川: [38.4872, 106.2309],
@@ -55,9 +73,21 @@ const CITY_COORDINATES = {
   拉萨: [29.652, 91.1721],
   海口: [20.044, 110.1999],
   三亚: [18.2528, 109.512],
+  鄂州: [30.3919, 114.8948],
+  泸州: [28.8718, 105.4423],
+  凯里: [26.5662, 107.9804],
+  黔东南: [26.5834, 107.9774],
   香港: [22.3193, 114.1694],
   澳门: [22.1987, 113.5439],
   台北: [25.033, 121.5654],
+  新北: [25.0169, 121.4628],
+  桃园: [24.9936, 121.301],
+  新竹: [24.8138, 120.9675],
+  台中: [24.1477, 120.6736],
+  台南: [22.9999, 120.2269],
+  高雄: [22.6273, 120.3014],
+  南投: [23.9609, 120.9719],
+  南港: [25.0553, 121.607],
 };
 
 function buildSeriesKey(event) {
@@ -102,6 +132,14 @@ function unwrapEvents(payload) {
   return [];
 }
 
+function payloadPageInfo(payload) {
+  return {
+    total: Number(payload?.total || payload?.data?.total || 0),
+    current: Number(payload?.current || payload?.data?.current || 1),
+    pageSize: Number(payload?.pageSize || payload?.data?.pageSize || 0),
+  };
+}
+
 function unwrapDetail(payload) {
   if (payload?.data && !Array.isArray(payload.data)) return payload.data;
   return payload || {};
@@ -110,6 +148,55 @@ function unwrapDetail(payload) {
 async function fetchRecentEvents() {
   const keepOld = appConfig.fcc.keepOld ?? true;
   return fccGet(FCC_CALENDAR_PATH, { keepOld: String(keepOld).toLowerCase() });
+}
+
+function addMonths(date, months) {
+  const next = new Date(date);
+  next.setUTCMonth(next.getUTCMonth() + months);
+  return next;
+}
+
+function syncDateRange() {
+  const now = new Date();
+  const pastMonths = Number(appConfig.fcc.syncPastMonths ?? 18);
+  const futureMonths = Number(appConfig.fcc.syncFutureMonths ?? 18);
+  const from = appConfig.fcc.syncFrom || addMonths(now, -pastMonths).toISOString();
+  const to = appConfig.fcc.syncTo || addMonths(now, futureMonths).toISOString();
+  return { from, to };
+}
+
+async function fetchPagedEvents() {
+  const events = [];
+  const pageSize = Number(appConfig.fcc.pageSize || 100);
+  const maxPages = Number(appConfig.fcc.maxPages || 20);
+  const { from, to } = syncDateRange();
+
+  for (let current = 1; current <= maxPages; current++) {
+    const payload = await fccGet(FCC_LIST_PATH, {
+      current,
+      pageSize,
+      eventStartAt: from,
+      eventEndAt: to,
+    });
+    const pageEvents = unwrapEvents(payload);
+    const pageInfo = payloadPageInfo(payload);
+    events.push(...pageEvents);
+
+    if (!pageEvents.length) break;
+    if (pageInfo.total && events.length >= pageInfo.total) break;
+    if (pageInfo.pageSize && pageEvents.length < pageInfo.pageSize) break;
+  }
+
+  return { events, from, to };
+}
+
+async function fetchCalendarEvents() {
+  if (FCC_LIST_PATH) {
+    return fetchPagedEvents();
+  }
+
+  const payload = await fetchRecentEvents();
+  return { events: unwrapEvents(payload), from: null, to: null };
 }
 
 async function fetchEventDetail(eventId) {
@@ -315,15 +402,15 @@ async function syncFCC() {
 
   try {
     console.log('🔄 Starting FCC calendar sync...');
-    const payload = await fetchRecentEvents();
-    const events = unwrapEvents(payload);
+    const { events, from, to } = await fetchCalendarEvents();
     stats.fetched = events.length;
-    console.log(`  📥 Fetched ${events.length} calendar events from FCC`);
+    const rangeLabel = from && to ? ` (${from.slice(0, 10)} to ${to.slice(0, 10)})` : '';
+    console.log(`  📥 Fetched ${events.length} calendar events from FCC${rangeLabel}`);
 
     for (const listEvent of events) {
       try {
         let detailEvent = null;
-        if (appConfig.fcc.fetchDetails !== false) {
+        if (appConfig.fcc.fetchDetails === true) {
           try {
             detailEvent = await fetchEventDetail(listEvent.id);
             stats.detailed++;

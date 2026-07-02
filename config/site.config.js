@@ -38,10 +38,15 @@ module.exports = {
   },
   fcc: {
     baseUrl: 'https://api.furrycons.cn/open',
+    listPath: '/event',
     calendarPath: '/event/recent',
     detailPath: '/event',
     keepOld: true,
-    fetchDetails: true,
+    fetchDetails: false,
+    syncPastMonths: 18,
+    syncFutureMonths: 18,
+    pageSize: 100,
+    maxPages: 20,
     syncInterval: 24 * 60 * 60 * 1000,
   },
 };
