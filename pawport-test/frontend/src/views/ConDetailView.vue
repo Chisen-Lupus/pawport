@@ -8,7 +8,7 @@
       <div class="con-heading">
         <h2>{{ con.name }}</h2>
         <p>{{ con.start_date }} - {{ con.end_date }}</p>
-        <p v-if="con.venue || con.city">{{ [con.venue, con.city].filter(Boolean).join(' · ') }}</p>
+        <p v-if="shouldShowVenueLine(con)">{{ [con.venue, con.city].filter(Boolean).join(' · ') }}</p>
         <p v-if="con.address" class="muted">{{ con.address }}</p>
       </div>
     </section>
@@ -110,6 +110,19 @@ function hotelPieBackground(hotels = []) {
   })
 
   return `conic-gradient(${segments.join(', ')})`
+}
+
+function shouldShowVenueLine(conInfo) {
+  if (!conInfo?.venue) return false
+  const venue = normalizeDisplayText(conInfo.venue)
+  const address = normalizeDisplayText(conInfo.address)
+  if (!venue) return false
+  if (!address) return true
+  return !address.includes(venue) && !venue.includes(address)
+}
+
+function normalizeDisplayText(value = '') {
+  return String(value).replace(/\s+/g, '').trim().toLowerCase()
 }
 
 watch(() => route.params.id, id => {

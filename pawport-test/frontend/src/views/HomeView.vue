@@ -69,7 +69,7 @@
             <div>
               <h3>{{ windowItem.data.name }}</h3>
               <p>{{ formatDate(windowItem.data.start_date) }} - {{ formatDate(windowItem.data.end_date) }}</p>
-              <p v-if="windowItem.data.venue">{{ windowItem.data.venue }}</p>
+              <p v-if="shouldShowVenueLine(windowItem.data)">{{ windowItem.data.venue }}</p>
               <p v-if="windowItem.data.address" class="muted">{{ windowItem.data.address }}</p>
             </div>
           </div>
@@ -346,6 +346,19 @@ function resetFilters() {
 function showAllDates() {
   mapFilters.from = ''
   mapFilters.to = ''
+}
+
+function shouldShowVenueLine(con) {
+  if (!con?.venue) return false
+  const venue = normalizeDisplayText(con.venue)
+  const address = normalizeDisplayText(con.address)
+  if (!venue) return false
+  if (!address) return true
+  return !address.includes(venue) && !venue.includes(address)
+}
+
+function normalizeDisplayText(value = '') {
+  return String(value).replace(/\s+/g, '').trim().toLowerCase()
 }
 
 function parseDateInput(value, fallback) {
