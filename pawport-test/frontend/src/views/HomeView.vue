@@ -227,6 +227,7 @@ let trajectoryHideTimer = null
 let currentUserTrajectoryTimer = null
 const trajectoryUsers = ref([])
 const trajectoryLayersByUser = new Map()
+const TRAJECTORY_PANE = 'trajectoryPane'
 
 function toDateInput(date) {
   const year = date.getFullYear()
@@ -668,6 +669,8 @@ function initMap() {
   })
 
   L.control.zoom({ position: 'bottomright' }).addTo(map)
+  const trajectoryPane = map.createPane(TRAJECTORY_PANE)
+  trajectoryPane.style.zIndex = 450
   trajectoriesLayer = L.layerGroup().addTo(map)
   markersLayer = L.layerGroup().addTo(map)
   activeCalloutsLayer = L.layerGroup().addTo(map)
@@ -972,6 +975,7 @@ function drawUserTrajectory(user, segmentCounts, animate = true) {
       color: segment.color,
       weight: Math.min(9, 2 + segment.count),
       opacity: myConIds.value.size ? 0.72 : 0.56,
+      pane: TRAJECTORY_PANE,
       className: ['trajectory-line', animate ? 'trajectory-appear' : ''].filter(Boolean).join(' '),
     })
     polyline.bindTooltip(String(segment.count), {
@@ -1096,7 +1100,7 @@ function createArrow(points, color, count, animate = true) {
     iconSize: [arrowSize, arrowSize],
     iconAnchor: [arrowSize / 2, arrowSize / 2],
   })
-  return L.marker(points[midIndex], { icon, interactive: false })
+  return L.marker(points[midIndex], { icon, interactive: false, pane: TRAJECTORY_PANE })
 }
 
 function compareVisitsByConDate(a, b) {
