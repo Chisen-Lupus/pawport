@@ -66,7 +66,15 @@
     "editHotels": "Edit Hotels",
     "useVenue": "Use venue as hotel",
     "saveHotels": "Save Hotels",
-    "distribution": "Hotel Distribution"
+    "distribution": "Hotel Distribution",
+    "searchHotels": "Search Hotels",
+    "searchPlaceholder": "Search hotels, defaulting to {venue}",
+    "addressOptionalPlaceholder": "Leave blank if not needed",
+    "savedHotels": "Saved Hotels",
+    "submitHotel": "Submit Hotel",
+    "country": "Country",
+    "notes": "Notes",
+    "venueFallback": "venue"
   },
   "user": {
     "profile": "Profile",
@@ -84,7 +92,8 @@
     "showHotel": "Show Hotel Info",
     "save": "Save",
     "saved": "Saved",
-    "exportProfile": "Export Current Profile"
+    "exportProfile": "Export Current Profile",
+    "optional": "Optional"
   },
   "auth": {
     "login": "Login",

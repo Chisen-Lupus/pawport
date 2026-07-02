@@ -88,31 +88,107 @@
             </div>
 
             <div v-if="hotelEditors[uc.id]?.open" class="history-hotel-editor">
-              <label class="switch-row small">
-                <span class="switch-copy">{{ $t('hotel.useVenue') }}</span>
-                <input
-                  class="switch-input"
-                  type="checkbox"
-                  :checked="hotelEditors[uc.id].useVenue"
-                  @change="toggleVenueHotel(uc, $event.target.checked)"
-                />
-                <span class="switch-track"><span class="switch-thumb"></span></span>
-              </label>
-
-              <div v-for="(hotel, index) in hotelEditors[uc.id].hotels" :key="index" class="hotel-row history">
-                <input v-model="hotel.name" :placeholder="$t('hotel.name')" />
-                <input v-model="hotel.address" :placeholder="$t('hotel.address')" />
-                <div class="form-row">
-                  <input v-model="hotel.check_in" type="date" />
-                  <input v-model="hotel.check_out" type="date" />
+              <div class="history-hotel-summary" v-if="hotelEditors[uc.id].savedHotels?.length">
+                <span class="history-hotel-summary-label">{{ $t('hotel.savedHotels') }}</span>
+                <div class="history-hotel-chips">
+                  <button
+                    v-for="hotel in hotelEditors[uc.id].savedHotels"
+                    :key="hotel.hotel_id || `${hotel.name}-${hotel.address}-${hotel.city}`"
+                    type="button"
+                    class="history-hotel-chip"
+                    @click="selectHistoryHotel(uc, hotel)"
+                  >
+                    {{ hotel.name }}
+                  </button>
                 </div>
-                <button class="remove-hotel" @click="removeHistoryHotelRow(uc, index)">×</button>
               </div>
 
-              <div class="history-hotel-actions">
-                <button class="link-btn" @click="addHistoryHotelRow(uc)">+ {{ $t('con.addHotel') }}</button>
-                <button class="btn btn-primary" @click="saveHistoryHotels(uc)" :disabled="savingHotelConId === uc.id">
-                  {{ savingHotelConId === uc.id ? $t('common.loading') : $t('hotel.saveHotels') }}
+              <div class="history-hotel-search">
+                <label>{{ $t('hotel.searchHotels') }}</label>
+                <div class="hotel-search-row">
+                  <input
+                    v-model="hotelEditors[uc.id].searchQuery"
+                    type="text"
+                    :placeholder="$t('hotel.searchPlaceholder', { venue: hotelEditors[uc.id].template || $t('hotel.venueFallback') })"
+                    @keyup.enter="searchHistoryHotels(uc)"
+                  />
+                  <button type="button" class="btn btn-outline hotel-search-btn" @click="searchHistoryHotels(uc)">
+                    {{ $t('common.search') }}
+                  </button>
+                </div>
+
+                <div class="search-results" v-if="hotelEditors[uc.id].searchResults?.length">
+                  <button
+                    v-for="hotel in hotelEditors[uc.id].searchResults"
+                    :key="hotel.id"
+                    type="button"
+                    class="search-item history-hotel-result"
+                    @click="selectHistoryHotel(uc, hotel)"
+                  >
+                    <span>{{ hotel.name }}</span>
+                    <span class="search-item-date">
+                      {{ [hotel.city, hotel.address].filter(Boolean).join(' · ') || $t('common.noResults') }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="history-hotel-form">
+                <div class="selected-con" v-if="hotelEditors[uc.id].selectedHotel">
+                  <strong>{{ hotelEditors[uc.id].selectedHotel.name }}</strong>
+                  <button type="button" @click="clearSelectedHistoryHotel(uc)">×</button>
+                </div>
+
+                <div class="form-group">
+                  <label>{{ $t('hotel.name') }}</label>
+                  <input
+                    v-model="hotelEditors[uc.id].draft.name"
+                    type="text"
+                    :placeholder="hotelEditors[uc.id].selectedHotel?.name || $t('hotel.searchPlaceholder', { venue: hotelEditors[uc.id].template || $t('hotel.venueFallback') })"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>
+                    {{ $t('hotel.address') }}
+                    <span class="field-optional">({{ $t('common.optional') }})</span>
+                  </label>
+                  <input
+                    v-model="hotelEditors[uc.id].draft.address"
+                    type="text"
+                    :placeholder="hotelEditors[uc.id].selectedHotel?.address || $t('hotel.addressOptionalPlaceholder')"
+                  />
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.city') }}</label>
+                    <input v-model="hotelEditors[uc.id].draft.city" type="text" />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('hotel.country') }}</label>
+                    <input v-model="hotelEditors[uc.id].draft.country" type="text" />
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.startDate') }}</label>
+                    <input v-model="hotelEditors[uc.id].draft.check_in" type="date" />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('con.endDate') }}</label>
+                    <input v-model="hotelEditors[uc.id].draft.check_out" type="date" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>{{ $t('hotel.notes') }}</label>
+                  <textarea v-model="hotelEditors[uc.id].draft.notes" rows="2"></textarea>
+                </div>
+
+                <button type="button" class="btn btn-primary btn-full" @click="saveHistoryHotel(uc)" :disabled="hotelEditors[uc.id].saving">
+                  {{ hotelEditors[uc.id].saving ? $t('common.loading') : $t('hotel.submitHotel') }}
                 </button>
               </div>
             </div>
@@ -314,7 +390,6 @@ const uploadingConAvatar = ref(false)
 const newConAvatarFile = ref(null)
 const newConAvatarPreview = ref('')
 const hotelEditors = reactive({})
-const savingHotelConId = ref('')
 
 const form = reactive({
   display_name: authStore.user?.display_name || '',
@@ -500,6 +575,7 @@ function buildHotelPayload(rows, conLike) {
 
 function hotelRowsFromVisit(visit) {
   return (visit.Hotels || []).map(hotel => ({
+    hotel_id: hotel.id,
     name: hotel.name || '',
     address: hotel.address || '',
     city: hotel.city || visit.Con?.city || '',
@@ -509,15 +585,21 @@ function hotelRowsFromVisit(visit) {
     check_in: hotel.UserConHotel?.check_in || '',
     check_out: hotel.UserConHotel?.check_out || '',
     notes: hotel.UserConHotel?.notes || '',
-    fromVenue: false,
   }))
 }
 
 function createHotelEditor(visit) {
+  const template = visit.Con?.venue || visit.Con?.name || ''
   return {
     open: false,
-    useVenue: false,
-    hotels: hotelRowsFromVisit(visit),
+    template,
+    searchPlaceholder: template,
+    searchQuery: '',
+    searchResults: [],
+    selectedHotel: null,
+    draft: createHistoryHotelDraft(visit),
+    savedHotels: hotelRowsFromVisit(visit),
+    saving: false,
   }
 }
 
@@ -533,9 +615,16 @@ function syncHotelEditors() {
       return
     }
 
-    if (!hotelEditors[visit.id].open) {
-      hotelEditors[visit.id].useVenue = false
-      hotelEditors[visit.id].hotels = hotelRowsFromVisit(visit)
+    const editor = hotelEditors[visit.id]
+    editor.template = visit.Con?.venue || visit.Con?.name || ''
+    editor.searchPlaceholder = editor.template
+    editor.savedHotels = hotelRowsFromVisit(visit)
+
+    if (!editor.open) {
+      editor.searchQuery = ''
+      editor.searchResults = []
+      editor.selectedHotel = null
+      editor.draft = createHistoryHotelDraft(visit)
     }
   })
 }
@@ -547,50 +636,140 @@ function ensureHotelEditor(visit) {
   return hotelEditors[visit.id]
 }
 
+function createHistoryHotelDraft(visit, hotel = null) {
+  return {
+    name: hotel?.name || '',
+    address: hotel?.address || '',
+    city: hotel?.city || visit.Con?.city || '',
+    country: hotel?.country || visit.Con?.country || '中国',
+    check_in: hotel?.check_in || visit.Con?.start_date || '',
+    check_out: hotel?.check_out || visit.Con?.end_date || '',
+    notes: hotel?.notes || '',
+  }
+}
+
 function toggleHistoryHotelEditor(visit) {
   const editor = ensureHotelEditor(visit)
   editor.open = !editor.open
-  if (editor.open && editor.hotels.length === 0) {
-    editor.useVenue = false
+  if (editor.open) {
+    editor.searchResults = []
+    editor.searchQuery = ''
+    editor.selectedHotel = null
+    editor.draft = createHistoryHotelDraft(visit)
   }
 }
 
-function toggleVenueHotel(visit, checked) {
+function clearSelectedHistoryHotel(visit) {
   const editor = ensureHotelEditor(visit)
-  editor.useVenue = checked
-  if (checked) {
-    const existingVenueRow = editor.hotels.some(hotel => hotel.fromVenue)
-    if (!existingVenueRow) {
-      editor.hotels.unshift(buildVenueHotelRow(visit))
-    }
+  editor.selectedHotel = null
+  editor.draft = createHistoryHotelDraft(visit)
+}
+
+async function searchHistoryHotels(visit) {
+  const editor = ensureHotelEditor(visit)
+  const query = editor.searchQuery.trim() || editor.template.trim()
+  if (!query) {
+    editor.searchResults = []
     return
   }
 
-  editor.hotels = editor.hotels.filter(hotel => !hotel.fromVenue)
+  try {
+    const res = await api.get('/hotels', { params: { search: query } })
+    editor.searchResults = res.data.hotels || []
+  } catch (error) {
+    editor.searchResults = []
+  }
 }
 
-function addHistoryHotelRow(visit) {
+function selectHistoryHotel(visit, hotel) {
   const editor = ensureHotelEditor(visit)
-  editor.hotels.push({
-    ...buildVenueHotelRow(visit),
-    fromVenue: false,
+  editor.selectedHotel = hotel
+  editor.searchQuery = hotel.name || editor.searchQuery
+  editor.draft = createHistoryHotelDraft(visit, {
+    name: hotel.name,
+    address: hotel.address,
+    city: hotel.city,
+    country: hotel.country,
+    check_in: hotel.check_in || visit.Con?.start_date || '',
+    check_out: hotel.check_out || visit.Con?.end_date || '',
+    notes: hotel.notes || '',
   })
 }
 
-function removeHistoryHotelRow(visit, index) {
-  const editor = ensureHotelEditor(visit)
-  editor.hotels.splice(index, 1)
-  editor.useVenue = editor.hotels.some(hotel => hotel.fromVenue)
+function normalizeHotelIdentity(value = '') {
+  return String(value || '').replace(/\s+/g, '').trim().toLowerCase()
 }
 
-async function saveHistoryHotels(visit) {
+function sameHotelIdentity(a, b) {
+  if (!a || !b) return false
+  if (a.hotel_id && b.hotel_id && a.hotel_id === b.hotel_id) return true
+
+  return [
+    normalizeHotelIdentity(a.name),
+    normalizeHotelIdentity(a.address),
+    normalizeHotelIdentity(a.city),
+    normalizeHotelIdentity(a.country),
+  ].join('|') === [
+    normalizeHotelIdentity(b.name),
+    normalizeHotelIdentity(b.address),
+    normalizeHotelIdentity(b.city),
+    normalizeHotelIdentity(b.country),
+  ].join('|')
+}
+
+function mergeHistoryHotelPayload(existingHotels, nextHotel) {
+  const merged = [...existingHotels]
+  const index = merged.findIndex(hotel => sameHotelIdentity(hotel, nextHotel))
+
+  if (index >= 0) {
+    merged[index] = { ...merged[index], ...nextHotel }
+  } else {
+    merged.push(nextHotel)
+  }
+
+  return merged
+}
+
+function buildHistoryHotelPayload(visit, editor) {
+  const draftName = editor.draft.name.trim() || editor.selectedHotel?.name?.trim() || editor.template.trim()
+  if (!draftName) return hotelRowsFromVisit(visit)
+
+  const existingHotels = hotelRowsFromVisit(visit)
+  const selectedHotel = editor.selectedHotel
+  const shouldReuseSelectedHotel = selectedHotel && sameHotelIdentity(
+    createHistoryHotelDraft(visit, selectedHotel),
+    {
+      name: editor.draft.name || selectedHotel.name,
+      address: editor.draft.address || selectedHotel.address,
+      city: editor.draft.city || selectedHotel.city || visit.Con?.city || '',
+      country: editor.draft.country || selectedHotel.country || visit.Con?.country || '',
+    },
+  )
+
+  const nextHotel = {
+    hotel_id: shouldReuseSelectedHotel ? selectedHotel.id : undefined,
+    name: draftName,
+    address: editor.draft.address.trim() || undefined,
+    city: editor.draft.city.trim() || visit.Con?.city || undefined,
+    country: editor.draft.country.trim() || visit.Con?.country || undefined,
+    latitude: shouldReuseSelectedHotel ? selectedHotel.latitude || undefined : undefined,
+    longitude: shouldReuseSelectedHotel ? selectedHotel.longitude || undefined : undefined,
+    check_in: editor.draft.check_in || undefined,
+    check_out: editor.draft.check_out || undefined,
+    notes: editor.draft.notes || undefined,
+  }
+
+  return mergeHistoryHotelPayload(existingHotels, nextHotel)
+}
+
+async function saveHistoryHotel(visit) {
   const editor = ensureHotelEditor(visit)
-  savingHotelConId.value = visit.id
+  editor.saving = true
   try {
     await consStore.markAttendance(visit.con_id, {
       comment: visit.comment || undefined,
       rating: visit.rating || undefined,
-      hotels: buildHotelPayload(editor.hotels, visit),
+      hotels: buildHistoryHotelPayload(visit, editor),
     })
     editor.open = false
     await fetchUserCons()
@@ -599,7 +778,7 @@ async function saveHistoryHotels(visit) {
   } catch (error) {
     console.error('Failed to save hotels:', error)
   } finally {
-    savingHotelConId.value = ''
+    editor.saving = false
   }
 }
 
@@ -1109,27 +1288,85 @@ watch(() => form.show_on_homepage, value => {
 
 .history-hotel-editor {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin-top: 10px;
-  padding-top: 10px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-card) 85%, transparent);
   border-top: 1px solid var(--border);
 }
 
-.hotel-row.history {
-  background: var(--bg);
+.history-hotel-summary {
+  display: grid;
+  gap: 8px;
 }
 
-.history-hotel-actions {
+.history-hotel-summary-label {
+  color: var(--text-secondary);
+  font-size: 0.76em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.history-hotel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.history-hotel-chip {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.78em;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.history-hotel-chip:hover {
+  border-color: var(--user-primary, var(--primary));
+  color: var(--user-primary, var(--primary));
+}
+
+.history-hotel-search,
+.history-hotel-form {
+  display: grid;
+  gap: 8px;
+}
+
+.history-hotel-search > label {
+  color: var(--text-secondary);
+  font-size: 0.8em;
+  font-weight: 700;
+}
+
+.hotel-search-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+}
 
-  .btn {
-    min-height: 32px;
-    padding: 6px 12px;
-    font-size: 0.82em;
-  }
+.hotel-search-row input {
+  flex: 1;
+}
+
+.hotel-search-btn {
+  min-width: 70px;
+  padding-inline: 12px;
+}
+
+.history-hotel-result {
+  width: 100%;
+  text-align: left;
+}
+
+.field-optional {
+  color: var(--text-secondary);
+  font-size: 0.84em;
+  font-weight: 400;
 }
 
 .add-con-modal, .submit-con-form {
@@ -1166,6 +1403,12 @@ watch(() => form.show_on_homepage, value => {
   padding: 10px;
   cursor: pointer;
   border-radius: var(--radius-sm);
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   transition: background var(--transition);
   
   &:hover { background: var(--bg-card); }

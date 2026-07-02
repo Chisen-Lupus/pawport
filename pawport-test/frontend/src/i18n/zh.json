@@ -66,7 +66,15 @@
     "editHotels": "编辑酒店",
     "useVenue": "使用会场作为酒店",
     "saveHotels": "保存酒店",
-    "distribution": "住宿分布"
+    "distribution": "住宿分布",
+    "searchHotels": "搜索酒店",
+    "searchPlaceholder": "搜索酒店，默认参考 {venue}",
+    "addressOptionalPlaceholder": "可留空",
+    "savedHotels": "已添加酒店",
+    "submitHotel": "提交新酒店",
+    "country": "国家",
+    "notes": "备注",
+    "venueFallback": "会场"
   },
   "user": {
     "profile": "个人资料",
@@ -84,7 +92,8 @@
     "showHotel": "展示住宿信息",
     "save": "保存",
     "saved": "已保存",
-    "exportProfile": "导出当前用户资料"
+    "exportProfile": "导出当前用户资料",
+    "optional": "可选"
   },
   "auth": {
     "login": "登录",
