@@ -1,0 +1,67 @@
+pawport/
+├── backend/
+│   ├── database/
+│   │   ├── migrations/
+│   │   │   └── .gitkeep
+│   │   ├── init.js
+│   │   └── seed.js
+│   ├── middleware/
+│   │   └── auth.js
+│   ├── models/
+│   │   ├── Con.js
+│   │   ├── Hotel.js
+│   │   ├── User.js
+│   │   ├── UserCon.js
+│   │   └── UserConHotel.js
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── cons.js
+│   │   ├── hotels.js
+│   │   └── users.js
+│   ├── services/
+│   │   └── fccSync.js
+│   ├── utils/
+│   │   └── .gitkeep
+│   ├── package.json
+│   └── server.js
+├── config/
+│   ├── app.config.js
+│   └── secrets.config.js
+├── docs/
+│   ├── local-quick-start.md
+│   └── source-note.md
+├── frontend/
+│   ├── public/
+│   │   └── favicon.svg
+│   ├── src/
+│   │   ├── assets/
+│   │   │   └── styles/
+│   │   │       └── global.scss
+│   │   ├── components/
+│   │   │   └── UserPanel.vue
+│   │   ├── i18n/
+│   │   │   ├── en.json
+│   │   │   └── zh.json
+│   │   ├── stores/
+│   │   │   ├── auth.js
+│   │   │   ├── cons.js
+│   │   │   └── theme.js
+│   │   ├── utils/
+│   │   │   └── api.js
+│   │   ├── views/
+│   │   │   ├── ConDetailView.vue
+│   │   │   ├── ExploreView.vue
+│   │   │   ├── HomeView.vue
+│   │   │   ├── LoginView.vue
+│   │   │   ├── RegisterView.vue
+│   │   │   ├── StatsView.vue
+│   │   │   └── UserProfileView.vue
+│   │   ├── App.vue
+│   │   └── main.js
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── .env.example
+├── .gitignore
+├── deploy.sh
+└── README.md

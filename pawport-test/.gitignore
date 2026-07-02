@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.log
+.DS_Store
+frontend/dist/
+backend/uploads/
+backend/data/*.sqlite
+backend/data/*.sqlite-*
+deploy.tar.gz
