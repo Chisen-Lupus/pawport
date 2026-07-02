@@ -111,23 +111,6 @@
             </button>
           </div>
 
-          <div v-if="windowItem.data.hotelStats?.hotels?.length" class="hotel-stats">
-            <div class="hotel-stats-head">
-              <span class="section-label">{{ $t('hotel.distribution') }}</span>
-              <strong>{{ windowItem.data.hotelStats.total }}</strong>
-            </div>
-            <div class="hotel-stats-body">
-              <div class="hotel-pie" :style="{ background: hotelPieBackground(windowItem.data.hotelStats.hotels) }"></div>
-              <div class="hotel-legend">
-                <div v-for="hotel in windowItem.data.hotelStats.hotels" :key="`${hotel.name}-${hotel.address}`" class="hotel-legend-item">
-                  <span class="hotel-legend-dot" :style="{ background: hotel.color }"></span>
-                  <span class="hotel-legend-name">{{ hotel.name }}</span>
-                  <span class="hotel-legend-count">{{ hotel.count }} · {{ hotel.percent }}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="divider"></div>
 
           <div class="attendee-section">
@@ -147,6 +130,23 @@
               </button>
               <div v-if="(windowItem.data.attendees?.length || 0) > 19" class="attendee-more">
                 +{{ windowItem.data.attendees.length - 19 }}
+              </div>
+            </div>
+          </div>
+
+          <div v-if="windowItem.data.hotelStats?.hotels?.length" class="hotel-stats">
+            <div class="hotel-stats-head">
+              <span class="section-label">{{ $t('hotel.distribution') }}</span>
+              <strong>{{ windowItem.data.hotelStats.total }}</strong>
+            </div>
+            <div class="hotel-stats-body">
+              <div class="hotel-pie" :style="{ background: hotelPieBackground(windowItem.data.hotelStats.hotels) }"></div>
+              <div class="hotel-legend">
+                <div v-for="hotel in windowItem.data.hotelStats.hotels" :key="`${hotel.name}-${hotel.address}`" class="hotel-legend-item">
+                  <span class="hotel-legend-dot" :style="{ background: hotel.color }"></span>
+                  <span class="hotel-legend-name">{{ hotel.name }}</span>
+                  <span class="hotel-legend-count">{{ hotel.count }} · {{ hotel.percent }}%</span>
+                </div>
               </div>
             </div>
           </div>
