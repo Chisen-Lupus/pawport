@@ -518,6 +518,7 @@ function initMap() {
   markersLayer = L.layerGroup().addTo(map)
   activeCalloutsLayer = L.layerGroup().addTo(map)
   labelLayer = L.layerGroup().addTo(map)
+  map.on('zoomend', renderMarkers)
   applyTileTheme()
   renderMapLabels()
 }
@@ -566,7 +567,7 @@ function markerHtml(con, color, borderColor, size, isMine) {
   const width = Math.round(size * 1.38)
   const height = size
   const image = con.avatar_url
-    ? `<span class="marker-media"><img src="${escapeHtml(con.avatar_url)}" alt="" /></span>`
+    ? `<span class="marker-media" style="background-image:url('${escapeHtml(con.avatar_url)}')"></span>`
     : `<span class="marker-label">${label}</span>`
   return `
     <div class="marker-wrapper ${con.isActive ? 'active' : ''} ${isMine ? 'mine' : ''}" style="width:${width + 18}px;height:${height + 18}px;">
@@ -581,9 +582,7 @@ function renderMarkers() {
   markersLayer.clearLayers()
   activeCalloutsLayer.clearLayers()
 
-  filteredCons.value.forEach(con => {
-    if (!con.latitude || !con.longitude) return
-
+  buildMarkerPlacements(filteredCons.value).forEach(({ con, latLng }) => {
     const isMine = myConIds.value.has(con.id)
     const baseColor = con.theme_color || '#6C63FF'
     const color = con.isPast && !con.isActive ? '#F8FAFC' : baseColor
@@ -599,17 +598,79 @@ function renderMarkers() {
       iconAnchor: [(width + 18) / 2, (height + 18) / 2],
     })
 
-    const marker = L.marker([Number(con.latitude), Number(con.longitude)], { icon })
-    marker.on('click', () => openConWindow(con))
+    const marker = L.marker(latLng, { icon })
+    marker.on('click', () => openConWindow(con, map?.latLngToContainerPoint(latLng)))
     markersLayer.addLayer(marker)
 
     if (con.isActive && con.Users?.length && showActiveCallouts.value) {
-      renderActiveCallout(con)
+      renderActiveCallout(con, latLng)
     }
   })
 }
 
-function renderActiveCallout(con) {
+function buildMarkerPlacements(cons) {
+  const groups = new Map()
+
+  cons.forEach(con => {
+    if (!con.latitude || !con.longitude) return
+
+    const lat = Number(con.latitude)
+    const lng = Number(con.longitude)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+
+    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(con)
+  })
+
+  const placements = []
+  groups.forEach(group => {
+    const sorted = [...group].sort(compareClusterCons)
+    sorted.forEach((con, index) => {
+      const baseLatLng = [Number(con.latitude), Number(con.longitude)]
+      const offset = markerClusterOffset(index, sorted.length)
+      const latLng = offset.x || offset.y
+        ? offsetLatLng(baseLatLng, offset)
+        : baseLatLng
+
+      placements.push({ con, latLng })
+    })
+  })
+
+  return placements
+}
+
+function compareClusterCons(a, b) {
+  const aTime = new Date(a.start_date || 0).getTime()
+  const bTime = new Date(b.start_date || 0).getTime()
+  if (aTime !== bTime) return aTime - bTime
+  return String(a.name || '').localeCompare(String(b.name || ''), themeStore.locale === 'zh' ? 'zh-Hans-CN' : 'en')
+}
+
+function markerClusterOffset(index, total) {
+  if (total <= 1) return { x: 0, y: 0 }
+
+  const columns = Math.ceil(Math.sqrt(total))
+  const rows = Math.ceil(total / columns)
+  const column = index % columns
+  const row = Math.floor(index / columns)
+
+  return {
+    x: (column - (columns - 1) / 2) * 70,
+    y: (row - (rows - 1) / 2) * 60,
+  }
+}
+
+function offsetLatLng(latLng, offset) {
+  if (!map) return latLng
+
+  const point = map.latLngToLayerPoint(latLng)
+  const shifted = L.point(point.x + offset.x, point.y + offset.y)
+  const shiftedLatLng = map.layerPointToLatLng(shifted)
+  return [shiftedLatLng.lat, shiftedLatLng.lng]
+}
+
+function renderActiveCallout(con, latLng = [Number(con.latitude), Number(con.longitude)]) {
   const attendees = con.Users || []
   const visible = attendees.slice(0, 19)
   const avatars = visible.map(attendee => {
@@ -626,8 +687,8 @@ function renderActiveCallout(con) {
     iconSize: [192, 184],
     iconAnchor: [24, 172],
   })
-  const marker = L.marker([Number(con.latitude), Number(con.longitude)], { icon, interactive: true })
-  marker.on('click', () => openConWindow(con))
+  const marker = L.marker(latLng, { icon, interactive: true })
+  marker.on('click', () => openConWindow(con, map?.latLngToContainerPoint(latLng)))
   activeCalloutsLayer.addLayer(marker)
 }
 
@@ -1545,17 +1606,13 @@ watch(
   z-index: 0;
   overflow: hidden;
   border-radius: 9px;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 :global(.marker-card:hover .marker-media) {
   border-radius: 14px;
-}
-
-:global(.marker-media img) {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 :global(.marker-label) {
