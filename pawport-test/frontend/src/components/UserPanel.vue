@@ -104,7 +104,7 @@
               </div>
 
               <div class="history-hotel-search">
-                <label>{{ $t('hotel.searchHotels') }}</label>
+                <label>{{ $t('hotel.searchExistingHotels') }}</label>
                 <div class="hotel-search-row">
                   <input
                     v-model="hotelEditors[uc.id].searchQuery"
@@ -116,6 +116,15 @@
                     {{ $t('common.search') }}
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  class="btn btn-outline hotel-default-btn"
+                  :disabled="hotelEditors[uc.id].saving || !hotelEditors[uc.id].template"
+                  @click="addDefaultHistoryHotel(uc)"
+                >
+                  {{ $t('hotel.addDefaultHotel', { venue: hotelEditors[uc.id].template || $t('hotel.venueFallback') }) }}
+                </button>
 
                 <div class="search-results" v-if="hotelEditors[uc.id].searchResults?.length">
                   <button
@@ -144,7 +153,7 @@
                   <input
                     v-model="hotelEditors[uc.id].draft.name"
                     type="text"
-                    :placeholder="hotelEditors[uc.id].selectedHotel?.name || $t('hotel.searchPlaceholder', { venue: hotelEditors[uc.id].template || $t('hotel.venueFallback') })"
+                    :placeholder="hotelEditors[uc.id].selectedHotel?.name || $t('hotel.defaultHotelNamePlaceholder', { venue: hotelEditors[uc.id].template || $t('hotel.venueFallback') })"
                   />
                 </div>
 
@@ -679,6 +688,27 @@ async function searchHistoryHotels(visit) {
   } catch (error) {
     editor.searchResults = []
   }
+}
+
+async function addDefaultHistoryHotel(visit) {
+  const editor = ensureHotelEditor(visit)
+  const venueName = editor.template.trim() || visit.Con?.venue || visit.Con?.name || ''
+  if (!venueName || editor.saving) {
+    return
+  }
+
+  editor.selectedHotel = null
+  editor.searchQuery = venueName
+  editor.searchResults = []
+  editor.draft = createHistoryHotelDraft(visit, {
+    name: venueName,
+    city: visit.Con?.city || '',
+    country: visit.Con?.country || '中国',
+    check_in: visit.Con?.start_date || '',
+    check_out: visit.Con?.end_date || '',
+  })
+
+  await saveHistoryHotel(visit)
 }
 
 function selectHistoryHotel(visit, hotel) {
@@ -1356,6 +1386,11 @@ watch(() => form.show_on_homepage, value => {
 .hotel-search-btn {
   min-width: 70px;
   padding-inline: 12px;
+}
+
+.hotel-default-btn {
+  width: 100%;
+  justify-content: center;
 }
 
 .history-hotel-result {
