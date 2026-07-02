@@ -28,6 +28,8 @@
     "regionUsa": "United States",
     "dateFrom": "Date From",
     "dateTo": "Date To",
+    "previousMonth": "-1 mo",
+    "nextMonth": "+1 mo",
     "resetFilter": "Reset"
   },
   "con": {

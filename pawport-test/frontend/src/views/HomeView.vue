@@ -20,6 +20,12 @@
         </select>
         <input v-model="mapFilters.from" type="date" :aria-label="$t('map.dateFrom')" />
         <input v-model="mapFilters.to" type="date" :aria-label="$t('map.dateTo')" />
+        <button class="filter-step" @click="shiftDateRange(-1)" :aria-label="$t('map.previousMonth')">
+          {{ $t('map.previousMonth') }}
+        </button>
+        <button class="filter-step" @click="shiftDateRange(1)" :aria-label="$t('map.nextMonth')">
+          {{ $t('map.nextMonth') }}
+        </button>
         <button class="filter-reset" @click="resetFilters">{{ $t('map.resetFilter') }}</button>
       </div>
     </div>
@@ -319,6 +325,18 @@ function resetFilters() {
   Object.assign(mapFilters, defaultFilters())
 }
 
+function parseDateInput(value, fallback) {
+  const source = value || fallback
+  const date = new Date(`${source}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? new Date() : date
+}
+
+function shiftDateRange(months) {
+  const fallback = defaultFilters()
+  mapFilters.from = toDateInput(addMonths(parseDateInput(mapFilters.from, fallback.from), months))
+  mapFilters.to = toDateInput(addMonths(parseDateInput(mapFilters.to, fallback.to), months))
+}
+
 function startDrag(event, windowItem) {
   bringToFront(windowItem.id)
   draggingWindowId.value = windowItem.id
@@ -566,8 +584,9 @@ function markerHtml(con, color, borderColor, size, isMine) {
   const textColor = con.isPast && !con.isActive ? '#5A6475' : '#FFFFFF'
   const width = Math.round(size * 1.38)
   const height = size
-  const image = con.avatar_url
-    ? `<span class="marker-media" style="background-image:url('${escapeHtml(con.avatar_url)}')"></span>`
+  const posterUrl = lowResMarkerImageUrl(con.poster_url || con.avatar_url)
+  const image = posterUrl
+    ? `<span class="marker-media" style="background-image:url(&quot;${escapeHtml(posterUrl)}&quot;)"></span>`
     : `<span class="marker-label">${label}</span>`
   return `
     <div class="marker-wrapper ${con.isActive ? 'active' : ''} ${isMine ? 'mine' : ''}" style="width:${width + 18}px;height:${height + 18}px;">
@@ -575,6 +594,26 @@ function markerHtml(con, color, borderColor, size, isMine) {
       <div class="marker-card" style="background:${color};border-color:${borderColor};color:${textColor};width:${width}px;height:${height}px;">${image}</div>
     </div>
   `
+}
+
+function lowResMarkerImageUrl(source) {
+  if (!source) return ''
+
+  const width = 96
+  const height = 72
+  const thumbnailUrl = `/api/media/thumbnail?url=${encodeURIComponent(source)}&w=${width}&h=${height}`
+  if (source.startsWith('/uploads/')) return thumbnailUrl
+
+  try {
+    const parsed = new URL(source, window.location.origin)
+    if (parsed.hostname === 'images.furrycons.cn') {
+      return thumbnailUrl
+    }
+  } catch (error) {
+    return source
+  }
+
+  return source
 }
 
 function renderMarkers() {
@@ -656,8 +695,8 @@ function markerClusterOffset(index, total) {
   const row = Math.floor(index / columns)
 
   return {
-    x: (column - (columns - 1) / 2) * 70,
-    y: (row - (rows - 1) / 2) * 60,
+    x: (column - (columns - 1) / 2) * 52,
+    y: (row - (rows - 1) / 2) * 42,
   }
 }
 
@@ -1130,6 +1169,7 @@ watch(
 
 .filter-controls select,
 .filter-controls input,
+.filter-step,
 .filter-reset {
   height: 30px;
   border: 1px solid var(--border);
@@ -1148,6 +1188,18 @@ watch(
 .filter-reset {
   cursor: pointer;
   color: var(--text-secondary);
+}
+
+.filter-step {
+  min-width: 52px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.filter-step:hover {
+  border-color: var(--user-primary, var(--primary));
+  color: var(--user-primary, var(--primary));
 }
 
 .active-cons-badge {
@@ -1809,6 +1861,7 @@ watch(
 
   .filter-controls select,
   .filter-controls input,
+  .filter-step,
   .filter-reset {
     flex: 1;
     min-width: 0;

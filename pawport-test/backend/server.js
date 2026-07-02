@@ -34,6 +34,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/cons', require('./routes/cons'));
 app.use('/api/hotels', require('./routes/hotels'));
+app.use('/api/media', require('./routes/media'));
 
 // Health check
 app.get('/api/health', (req, res) => {

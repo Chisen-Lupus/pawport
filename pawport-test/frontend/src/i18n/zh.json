@@ -28,6 +28,8 @@
     "regionUsa": "美国",
     "dateFrom": "开始日期",
     "dateTo": "结束日期",
+    "previousMonth": "-1月",
+    "nextMonth": "+1月",
     "resetFilter": "重置"
   },
   "con": {
