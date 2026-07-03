@@ -321,6 +321,21 @@ router.get('/admin/review', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/cons/submitted/me - List cons submitted by the current user
+router.get('/submitted/me', authenticate, async (req, res) => {
+  try {
+    const cons = await Con.findAll({
+      where: { submitted_by: req.userId },
+      order: [['created_at', 'DESC']],
+    });
+
+    res.json({ cons });
+  } catch (error) {
+    console.error('Submitted cons error:', error);
+    res.status(500).json({ error: 'Failed to fetch submitted cons' });
+  }
+});
+
 // GET /api/cons/:id - Get single con with attendees
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
@@ -573,7 +588,12 @@ router.put('/:id', authenticate, async (req, res) => {
       'theme_color', 'website', 'description', 'extra_fields',
     ];
 
-    if (req.user.role === 'admin') {
+    const canResubmit = req.user.role !== 'admin'
+      && con.submitted_by === req.userId
+      && con.status === 'rejected'
+      && req.body.status === 'pending';
+
+    if (req.user.role === 'admin' || canResubmit) {
       allowedFields.push('status');
     }
 

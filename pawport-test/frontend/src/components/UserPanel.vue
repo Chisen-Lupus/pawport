@@ -395,6 +395,135 @@
         </div>
       </section>
 
+      <section class="panel-section submitted-section">
+        <h4>{{ $t('con.mySubmittedCons') }}</h4>
+        <p class="history-hint">{{ $t('con.mySubmittedConsHint') }}</p>
+        <p v-if="submittedConMessage" class="form-message success">{{ submittedConMessage }}</p>
+        <p v-if="submittedConError" class="form-message error">{{ submittedConError }}</p>
+
+        <div v-if="submittedConsLoading" class="empty-row">{{ $t('common.loading') }}</div>
+        <div v-else-if="!submittedCons.length" class="empty-row">{{ $t('con.noSubmittedCons') }}</div>
+
+        <div v-else class="submitted-cons-list">
+          <article v-for="con in submittedCons" :key="con.id" class="submitted-con-item">
+            <div class="submitted-con-main">
+              <div class="submitted-con-info">
+                <div class="submitted-con-title">
+                  <strong>{{ con.name }}</strong>
+                  <span class="submitted-con-status" :class="`status-${submittedConStatus(con)}`">
+                    {{ submittedConStatusLabel(con) }}
+                  </span>
+                </div>
+                <span class="con-date">{{ con.start_date }} - {{ con.end_date }}</span>
+                <span v-if="submittedConHint(con)" class="con-status-hint">{{ submittedConHint(con) }}</span>
+              </div>
+              <div class="my-con-actions">
+                <button class="link-btn compact" type="button" @click="toggleSubmittedConEditor(con)">
+                  {{ submittedConEditors[con.id]?.open ? $t('common.close') : $t('common.edit') }}
+                </button>
+                <button
+                  v-if="submittedConStatus(con) === 'rejected'"
+                  class="link-btn compact"
+                  type="button"
+                  @click="resubmitSubmittedCon(con)"
+                  :disabled="savingSubmittedConId === con.id"
+                >
+                  {{ $t('con.resubmitCon') }}
+                </button>
+              </div>
+            </div>
+
+            <transition name="accordion">
+              <form
+                v-if="submittedConEditors[con.id]?.open"
+                class="submitted-con-form"
+                @submit.prevent="saveSubmittedCon(con)"
+              >
+                <div class="form-group">
+                  <label>{{ $t('con.name') }} *</label>
+                  <input v-model="submittedConEditors[con.id].draft.name" type="text" required />
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.startDate') }} *</label>
+                    <input v-model="submittedConEditors[con.id].draft.start_date" type="date" required />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('con.endDate') }} *</label>
+                    <input v-model="submittedConEditors[con.id].draft.end_date" type="date" required />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.localName') }}</label>
+                  <input v-model="submittedConEditors[con.id].draft.name_local" type="text" />
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.seriesKey') }}</label>
+                    <input v-model="submittedConEditors[con.id].draft.series_key" type="text" />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('con.edition') }}</label>
+                    <input v-model="submittedConEditors[con.id].draft.edition_label" type="text" />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.venue') }}</label>
+                  <input v-model="submittedConEditors[con.id].draft.venue" type="text" />
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('hotel.address') }}</label>
+                  <input v-model="submittedConEditors[con.id].draft.address" type="text" />
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.city') }}</label>
+                  <input v-model="submittedConEditors[con.id].draft.city" type="text" />
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.latitude') }}</label>
+                    <input v-model="submittedConEditors[con.id].draft.latitude" type="number" step="0.0000001" />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('con.longitude') }}</label>
+                    <input v-model="submittedConEditors[con.id].draft.longitude" type="number" step="0.0000001" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.theme') }}</label>
+                    <input v-model="submittedConEditors[con.id].draft.theme" type="text" />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('user.themeColor') }}</label>
+                    <input v-model="submittedConEditors[con.id].draft.theme_color" type="color" class="color-input" />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.website') }}</label>
+                  <input v-model="submittedConEditors[con.id].draft.website" type="url" />
+                </div>
+
+                <div class="submitted-con-actions">
+                  <button class="btn btn-outline btn-full" type="submit" :disabled="savingSubmittedConId === con.id">
+                    {{ savingSubmittedConId === con.id ? $t('common.loading') : $t('common.save') }}
+                  </button>
+                  <button
+                    v-if="submittedConStatus(con) === 'rejected'"
+                    class="btn btn-primary btn-full"
+                    type="button"
+                    @click="resubmitSubmittedCon(con)"
+                    :disabled="savingSubmittedConId === con.id"
+                  >
+                    {{ savingSubmittedConId === con.id ? $t('common.loading') : $t('con.resubmitCon') }}
+                  </button>
+                </div>
+              </form>
+            </transition>
+          </article>
+        </div>
+      </section>
+
       <section class="panel-section security-section">
         <button
           type="button"
@@ -481,12 +610,18 @@ const showSubmitCon = ref(false)
 const searchQuery = ref('')
 const searchResults = ref([])
 const userCons = ref([])
+const submittedCons = ref([])
+const submittedConsLoading = ref(false)
+const savingSubmittedConId = ref('')
+const submittedConMessage = ref('')
+const submittedConError = ref('')
 const selectedCon = ref(null)
 const uploadingAvatar = ref(false)
 const uploadingConAvatar = ref(false)
 const newConAvatarFile = ref(null)
 const newConAvatarPreview = ref('')
 const hotelEditors = reactive({})
+const submittedConEditors = reactive({})
 
 const form = reactive({
   display_name: authStore.user?.display_name || '',
@@ -648,6 +783,86 @@ async function fetchUserCons() {
   }
 }
 
+function sortConsByCreatedAtDesc(cons) {
+  return [...cons].sort((a, b) => {
+    const aTime = new Date(a.created_at || a.createdAt || a.start_date || 0).getTime()
+    const bTime = new Date(b.created_at || b.createdAt || b.start_date || 0).getTime()
+    return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime)
+  })
+}
+
+async function fetchSubmittedCons() {
+  submittedConsLoading.value = true
+  submittedConError.value = ''
+  try {
+    const res = await api.get('/cons/submitted/me')
+    submittedCons.value = sortConsByCreatedAtDesc(res.data.cons || [])
+    syncSubmittedConEditors()
+  } catch (error) {
+    submittedConError.value = t('con.submittedConLoadFailed')
+  } finally {
+    submittedConsLoading.value = false
+  }
+}
+
+function createSubmittedConDraft(con) {
+  return {
+    name: con.name || '',
+    name_local: con.name_local || '',
+    series_key: con.series_key || '',
+    edition_label: con.edition_label || '',
+    start_date: con.start_date || '',
+    end_date: con.end_date || '',
+    venue: con.venue || '',
+    address: con.address || '',
+    city: con.city || '',
+    latitude: con.latitude ?? '',
+    longitude: con.longitude ?? '',
+    theme: con.theme || '',
+    theme_color: con.theme_color || '#6C63FF',
+    website: con.website || '',
+  }
+}
+
+function syncSubmittedConEditors() {
+  const currentIds = new Set(submittedCons.value.map(con => con.id))
+  Object.keys(submittedConEditors).forEach(id => {
+    if (!currentIds.has(id)) delete submittedConEditors[id]
+  })
+
+  submittedCons.value.forEach(con => {
+    if (!submittedConEditors[con.id]) {
+      submittedConEditors[con.id] = {
+        open: false,
+        draft: createSubmittedConDraft(con),
+      }
+      return
+    }
+
+    if (!submittedConEditors[con.id].open) {
+      submittedConEditors[con.id].draft = createSubmittedConDraft(con)
+    }
+  })
+}
+
+function ensureSubmittedConEditor(con) {
+  if (!submittedConEditors[con.id]) {
+    submittedConEditors[con.id] = {
+      open: false,
+      draft: createSubmittedConDraft(con),
+    }
+  }
+  return submittedConEditors[con.id]
+}
+
+function toggleSubmittedConEditor(con) {
+  const editor = ensureSubmittedConEditor(con)
+  editor.open = !editor.open
+  if (editor.open) {
+    editor.draft = createSubmittedConDraft(con)
+  }
+}
+
 function toggleAddCon() {
   if (showAddCon.value) {
     closeAddCon()
@@ -681,6 +896,10 @@ function conStatus(visit) {
   return REVIEW_STATUSES.has(status) ? status : 'approved'
 }
 
+function normalizeReviewStatus(status) {
+  return REVIEW_STATUSES.has(status) ? status : 'approved'
+}
+
 function shouldShowConStatus(visit) {
   return conStatus(visit) !== 'approved'
 }
@@ -691,9 +910,86 @@ function conStatusLabel(visit) {
 
 function conStatusHint(visit) {
   const status = conStatus(visit)
+  return reviewStatusHint(status)
+}
+
+function submittedConStatus(con) {
+  return normalizeReviewStatus(con.status)
+}
+
+function submittedConStatusLabel(con) {
+  return t(`admin.status.${submittedConStatus(con)}`)
+}
+
+function submittedConHint(con) {
+  return reviewStatusHint(submittedConStatus(con))
+}
+
+function reviewStatusHint(status) {
   if (status === 'pending') return t('user.pendingConHint')
   if (status === 'rejected') return t('user.rejectedConHint')
   return ''
+}
+
+function cleanOptional(value) {
+  const cleaned = String(value ?? '').trim()
+  return cleaned || null
+}
+
+function cleanCoordinate(value) {
+  if (value === '' || value === null || value === undefined) return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+function buildSubmittedConPayload(con, status = null) {
+  const draft = ensureSubmittedConEditor(con).draft
+  const payload = {
+    name: cleanOptional(draft.name) || con.name,
+    name_local: cleanOptional(draft.name_local),
+    series_key: cleanOptional(draft.series_key),
+    edition_label: cleanOptional(draft.edition_label),
+    start_date: draft.start_date || con.start_date,
+    end_date: draft.end_date || con.end_date,
+    venue: cleanOptional(draft.venue),
+    address: cleanOptional(draft.address),
+    city: cleanOptional(draft.city),
+    latitude: cleanCoordinate(draft.latitude),
+    longitude: cleanCoordinate(draft.longitude),
+    theme: cleanOptional(draft.theme),
+    theme_color: cleanOptional(draft.theme_color) || '#6C63FF',
+    website: cleanOptional(draft.website),
+  }
+
+  if (status) payload.status = status
+  return payload
+}
+
+async function updateSubmittedCon(con, status = null) {
+  savingSubmittedConId.value = con.id
+  submittedConMessage.value = ''
+  submittedConError.value = ''
+  try {
+    await api.put(`/cons/${con.id}`, buildSubmittedConPayload(con, status))
+    submittedConMessage.value = status === 'pending'
+      ? t('con.submittedConResubmitted')
+      : t('con.submittedConSaved')
+    await fetchSubmittedCons()
+    await fetchUserCons()
+    await consStore.fetchMapCons()
+  } catch (error) {
+    submittedConError.value = t('con.submittedConSaveFailed')
+  } finally {
+    savingSubmittedConId.value = ''
+  }
+}
+
+function saveSubmittedCon(con) {
+  updateSubmittedCon(con)
+}
+
+function resubmitSubmittedCon(con) {
+  updateSubmittedCon(con, 'pending')
 }
 
 async function searchCons() {
@@ -1115,6 +1411,7 @@ async function submitNewCon() {
     showSubmitCon.value = false
     await consStore.markAttendance(con.id, buildAttendancePayload())
     await fetchUserCons()
+    await fetchSubmittedCons()
     await consStore.fetchMapCons()
     notifyAttendanceUpdated(con.id, true)
     showAddCon.value = false
@@ -1137,6 +1434,7 @@ function handleLogout() {
 
 onMounted(() => {
   fetchUserCons()
+  fetchSubmittedCons()
 })
 
 watch(() => form.show_on_homepage, value => {
@@ -1499,6 +1797,21 @@ watch(() => form.show_on_homepage, value => {
   margin: 12px 0;
 }
 
+.submitted-cons-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.empty-row {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.84em;
+  text-align: center;
+}
+
 .history-hint {
   margin: -4px 0 12px;
   color: var(--text-secondary);
@@ -1506,19 +1819,22 @@ watch(() => form.show_on_homepage, value => {
   line-height: 1.45;
 }
 
-.my-con-item {
+.my-con-item,
+.submitted-con-item {
   padding: 10px 12px;
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
 
-  .my-con-main {
+  .my-con-main,
+  .submitted-con-main {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 10px;
   }
   
-  .my-con-info {
+  .my-con-info,
+  .submitted-con-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -1535,7 +1851,8 @@ watch(() => form.show_on_homepage, value => {
     }
   }
 
-  .my-con-title {
+  .my-con-title,
+  .submitted-con-title {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -1579,6 +1896,45 @@ watch(() => form.show_on_homepage, value => {
     
     &:hover { background: #FEE; color: #E53E3E; }
   }
+}
+
+.submitted-con-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+  font-size: 0.68em;
+  font-weight: 800;
+
+  &.status-pending {
+    background: color-mix(in srgb, #F59E0B 16%, transparent);
+    color: #D97706;
+  }
+
+  &.status-approved {
+    background: color-mix(in srgb, #16A34A 14%, transparent);
+    color: #16A34A;
+  }
+
+  &.status-rejected {
+    background: color-mix(in srgb, #DC2626 14%, transparent);
+    color: #DC2626;
+  }
+}
+
+.submitted-con-form {
+  display: grid;
+  gap: 0;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+  border-top: 1px solid var(--border);
+}
+
+.submitted-con-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .history-hotel-editor {
@@ -1836,6 +2192,11 @@ watch(() => form.show_on_homepage, value => {
 .link-btn {
   color: var(--user-primary, var(--primary));
   font-weight: 600;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
 }
 
 .link-btn.compact {
