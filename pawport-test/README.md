@@ -70,6 +70,29 @@ This will:
 4. Install dependencies
 5. Setup PM2 process manager
 
+### SQLite to MySQL Migration
+
+The migration script copies users, cons, hotels, attendance records, and hotel links from the local SQLite file into a MySQL database.
+
+Dry run from the backend directory:
+
+```bash
+cd backend
+npm run db:migrate:sqlite-to-mysql -- --dry-run
+```
+
+Migrate into a BaoTa-created MySQL database:
+
+```bash
+MYSQL_HOST=127.0.0.1 \
+MYSQL_DB=sql_pawport_me \
+MYSQL_USER=sql_pawport_me \
+MYSQL_PASS='your-database-password' \
+npm run db:migrate:sqlite-to-mysql -- --sqlite ./data/pawport.sqlite --force-target
+```
+
+By default the script refuses to copy into non-empty MySQL tables. Use `--force-target` to drop and recreate target tables, or `--merge` to upsert into an existing target. Add `--create-database` only if the MySQL account can create databases.
+
 ### Nginx Config (via BaoBao Panel)
 ```nginx
 server {

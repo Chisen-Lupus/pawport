@@ -34,3 +34,24 @@
 
 - 前端构建：`cd pawport-test/frontend && npm run build`
 - 后端可直接部署到服务器，并把域名与 IP 配置替换到配置文件中。
+
+### SQLite 迁移到 MySQL
+
+在本地或服务器的后端目录运行：
+
+```bash
+cd pawport-test/backend
+npm run db:migrate:sqlite-to-mysql -- --dry-run
+```
+
+正式迁移到宝塔创建的 MySQL 库时，建议用环境变量传密码：
+
+```bash
+MYSQL_HOST=127.0.0.1 \
+MYSQL_DB=sql_pawport_me \
+MYSQL_USER=sql_pawport_me \
+MYSQL_PASS='你的数据库密码' \
+npm run db:migrate:sqlite-to-mysql -- --sqlite ./data/pawport.sqlite --force-target
+```
+
+默认情况下脚本只允许迁移到空 MySQL 表；`--force-target` 会清空并重建目标表，`--merge` 才会尝试合并到非空目标库。
