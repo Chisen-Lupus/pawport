@@ -57,6 +57,9 @@ module.exports = {
     startYear: 1989,
     futureYears: 1,
     requestDelayMs: 250,
+    fetchDetails: true,
+    detailRequestDelayMs: 1500,
+    stopDetailsOnRateLimit: true,
     syncCron: '0 4 1 * *',
   },
 };

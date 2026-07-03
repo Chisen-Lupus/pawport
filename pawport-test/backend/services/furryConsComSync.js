@@ -8,6 +8,13 @@ const { Con } = require('../database/init');
 const SOURCE = 'furrycons.com';
 const SOURCE_PREFIX = 'furrycons.com:';
 const DEFAULT_THEME_COLOR = '#6C63FF';
+const LOCATION_PRECISION_RANK = {
+  unknown: 0,
+  country: 1,
+  region: 2,
+  city: 3,
+  geo: 4,
+};
 
 const COUNTRY_COORDINATES = {
   Argentina: [-34.6037, -58.3816],
@@ -453,6 +460,60 @@ function parseCalendarEvents(html, year) {
   return tableEvents.length > jsonEvents.length ? tableEvents : jsonEvents;
 }
 
+function parseMapGeoFromHtml(html) {
+  const match = String(html || '').match(/google\.com\/maps\/place\/(-?\d+(?:\.\d+)?)\+(-?\d+(?:\.\d+)?)/i);
+  if (!match) return null;
+
+  const latitude = Number(match[1]);
+  const longitude = Number(match[2]);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { '@type': 'GeoCoordinates', latitude, longitude };
+}
+
+function parseDetailEventFromHtml(html, sourceUrl) {
+  const event = parseEventsFromHtml(html).find(item => item?.['@type'] === 'Event') || null;
+  const geo = parseMapGeoFromHtml(html);
+
+  if (!event && !geo) return null;
+  if (!event) {
+    return {
+      '@type': 'Event',
+      url: sourceUrl,
+      location: { '@type': 'Place', geo },
+    };
+  }
+
+  if (geo && !event.location?.geo) {
+    event.location = {
+      ...(event.location || {}),
+      geo,
+    };
+  }
+
+  if (!event.url) event.url = sourceUrl;
+  return event;
+}
+
+function mergeEventDetails(listEvent, detailEvent) {
+  if (!detailEvent) return listEvent;
+
+  return {
+    ...listEvent,
+    ...detailEvent,
+    url: firstValue(detailEvent.url, listEvent.url),
+    image: firstValue(detailEvent.image, listEvent.image),
+    location: {
+      ...(listEvent.location || {}),
+      ...(detailEvent.location || {}),
+      address: {
+        ...(listEvent.location?.address || {}),
+        ...(detailEvent.location?.address || {}),
+      },
+    },
+    detailSyncedAt: new Date().toISOString(),
+  };
+}
+
 function calendarUrl(year) {
   const baseUrl = String(appConfig.furryConsCom.baseUrl || 'https://furrycons.com').replace(/\/+$/, '');
   const path = appConfig.furryConsCom.calendarPath || '/calendar/calendar.php';
@@ -471,10 +532,91 @@ async function fetchYearEvents(year) {
     timeout: 30000,
   });
 
-  return { events: parseCalendarEvents(response.data, year), url };
+  const events = parseCalendarEvents(response.data, year);
+  if (!appConfig.furryConsCom?.fetchDetails) {
+    return { events, url, detailStats: { fetched: 0, failed: 0 } };
+  }
+
+  const detailDelayMs = Number(appConfig.furryConsCom?.detailRequestDelayMs || 0);
+  const detailStats = { fetched: 0, failed: 0 };
+  const enriched = [];
+  let stopDetails = false;
+
+  for (const event of events) {
+    if (stopDetails || !(await shouldFetchEventDetail(event))) {
+      enriched.push(event);
+      continue;
+    }
+
+    try {
+      const detail = await fetchEventDetail(event);
+      if (detail) detailStats.fetched++;
+      enriched.push(mergeEventDetails(event, detail));
+    } catch (error) {
+      detailStats.failed++;
+      enriched.push(event);
+      console.error(`  ⚠️ FurryCons.com detail fetch failed for ${event.url || event.name}:`, error.message);
+      if (error.response?.status === 429 && appConfig.furryConsCom?.stopDetailsOnRateLimit !== false) {
+        stopDetails = true;
+        console.error('  ⚠️ FurryCons.com rate limit reached; skipping remaining detail pages for this year');
+      }
+    }
+
+    if (detailDelayMs && event !== events[events.length - 1]) {
+      await sleep(detailDelayMs);
+    }
+  }
+
+  return { events: enriched, url, detailStats };
 }
 
-function coordinateForLocation({ city, region, country }) {
+async function shouldFetchEventDetail(event) {
+  const sourceUrl = normalizeFurryConsUrl(event.url);
+  if (!sourceUrl) return false;
+  if (event.location?.geo?.latitude && event.location?.geo?.longitude) return false;
+
+  const sourceId = eventIdFromUrl(sourceUrl);
+  if (!sourceId) return true;
+
+  const existing = await Con.findOne({
+    where: { fcc_id: `${SOURCE_PREFIX}${sourceId}` },
+    attributes: ['extra_fields'],
+  });
+
+  return precisionRank(existing?.extra_fields?.locationPrecision) < precisionRank('geo');
+}
+
+async function fetchEventDetail(event) {
+  const sourceUrl = normalizeFurryConsUrl(event.url);
+  if (!sourceUrl) return null;
+
+  const response = await axios.get(sourceUrl, {
+    headers: {
+      Accept: 'text/html,application/xhtml+xml',
+      'User-Agent': 'PawPortBot/0.1 (+https://pawport.me)',
+    },
+    timeout: 30000,
+  });
+
+  return parseDetailEventFromHtml(response.data, sourceUrl);
+}
+
+function numericCoordinate(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function precisionRank(precision) {
+  return LOCATION_PRECISION_RANK[precision] ?? LOCATION_PRECISION_RANK.unknown;
+}
+
+function coordinateForLocation({ city, region, country, latitude, longitude }) {
+  const directLatitude = numericCoordinate(latitude);
+  const directLongitude = numericCoordinate(longitude);
+  if (directLatitude !== null && directLongitude !== null) {
+    return { latitude: directLatitude, longitude: directLongitude, precision: 'geo' };
+  }
+
   const cleanCity = compact(city).split(',')[0];
   const cleanRegion = compact(region);
   const cleanCountry = compact(country);
@@ -502,8 +644,11 @@ function coordinateForLocation({ city, region, country }) {
   return { latitude: null, longitude: null, precision: 'unknown' };
 }
 
-function buildAddress(venue, city, region, country) {
-  const place = [city, region, country].map(compact).filter(Boolean).join(', ');
+function buildAddress({ venue, streetAddress, city, region, postalCode, country }) {
+  const cleanCity = compact(city);
+  const cleanRegion = compact(region);
+  const visibleRegion = cleanRegion && !cleanCity.toLowerCase().includes(cleanRegion.toLowerCase()) ? cleanRegion : '';
+  const place = [streetAddress, cleanCity, visibleRegion, postalCode, country].map(compact).filter(Boolean).join(', ');
   return [venue, place].map(compact).filter(Boolean).join(', ') || null;
 }
 
@@ -514,9 +659,17 @@ function mapEventToConData(event) {
   const country = firstValue(address.addressCountry, event.location?.addressCountry);
   const region = firstValue(address.addressRegion, event.location?.addressRegion);
   const city = firstValue(address.addressLocality, event.location?.addressLocality);
+  const postalCode = firstValue(address.postalCode, event.location?.postalCode);
+  const streetAddress = firstValue(address.streetAddress, event.location?.streetAddress);
   const venue = firstValue(event.location?.name, event.locationName);
   const seriesName = seriesNameFromEventName(event.name);
-  const coords = coordinateForLocation({ city, region, country });
+  const coords = coordinateForLocation({
+    city,
+    region,
+    country,
+    latitude: firstValue(event.location?.geo?.latitude, event.geo?.latitude),
+    longitude: firstValue(event.location?.geo?.longitude, event.geo?.longitude),
+  });
 
   return {
     name: event.name,
@@ -530,7 +683,7 @@ function mapEventToConData(event) {
     venue,
     city,
     country,
-    address: buildAddress(venue, city, region, country),
+    address: buildAddress({ venue, streetAddress, city, region, postalCode, country }),
     latitude: coords.latitude,
     longitude: coords.longitude,
     poster_url: normalizeFurryConsUrl(event.image),
@@ -548,6 +701,7 @@ function mapEventToConData(event) {
       sourceId,
       sourceUrl,
       furryConsComSyncedAt: new Date().toISOString(),
+      detailSyncedAt: event.detailSyncedAt || null,
       locationPrecision: coords.precision,
       eventStatus: event.eventStatus || null,
       attendanceMode: event.eventAttendanceMode || null,
@@ -564,6 +718,15 @@ async function upsertCon(conData) {
 
   if (wasCreated) return 'created';
 
+  const currentPrecision = con.extra_fields?.locationPrecision || 'unknown';
+  const nextPrecision = conData.extra_fields?.locationPrecision || 'unknown';
+  const keepCurrentLocation = precisionRank(currentPrecision) > precisionRank(nextPrecision);
+  const extraFields = {
+    ...(con.extra_fields || {}),
+    ...(conData.extra_fields || {}),
+    ...(keepCurrentLocation ? { locationPrecision: currentPrecision } : {}),
+  };
+
   await con.update({
     name: conData.name,
     name_en: conData.name_en || con.name_en,
@@ -574,11 +737,11 @@ async function upsertCon(conData) {
     start_date: conData.start_date,
     end_date: conData.end_date,
     venue: conData.venue || con.venue,
-    city: conData.city || con.city,
-    country: conData.country || con.country,
-    address: conData.address || con.address,
-    latitude: conData.latitude ?? con.latitude,
-    longitude: conData.longitude ?? con.longitude,
+    city: keepCurrentLocation ? con.city : conData.city || con.city,
+    country: keepCurrentLocation ? con.country : conData.country || con.country,
+    address: keepCurrentLocation ? con.address : conData.address || con.address,
+    latitude: keepCurrentLocation ? con.latitude : conData.latitude ?? con.latitude,
+    longitude: keepCurrentLocation ? con.longitude : conData.longitude ?? con.longitude,
     poster_url: conData.poster_url || con.poster_url,
     avatar_url: conData.avatar_url || con.avatar_url,
     theme: conData.theme || con.theme,
@@ -586,10 +749,7 @@ async function upsertCon(conData) {
     website: conData.website || con.website,
     description: conData.description || con.description,
     fcc_slug: conData.fcc_slug || con.fcc_slug,
-    extra_fields: {
-      ...(con.extra_fields || {}),
-      ...(conData.extra_fields || {}),
-    },
+    extra_fields: extraFields,
   });
 
   return 'updated';
@@ -618,16 +778,23 @@ async function syncFurryConsCom(options = {}) {
     updated: 0,
     skipped: 0,
     failed: 0,
+    detailsFetched: 0,
+    detailsFailed: 0,
   };
 
   console.log(`🔄 Starting FurryCons.com calendar sync (${fromYear}-${toYear})...`);
 
   for (let year = fromYear; year <= toYear; year++) {
     try {
-      const { events } = await fetchYearEvents(year);
+      const { events, detailStats } = await fetchYearEvents(year);
       stats.years++;
       stats.fetched += events.length;
-      console.log(`  📥 ${year}: fetched ${events.length} events from FurryCons.com`);
+      stats.detailsFetched += detailStats?.fetched || 0;
+      stats.detailsFailed += detailStats?.failed || 0;
+      const detailLog = detailStats && (detailStats.fetched || detailStats.failed)
+        ? `, ${detailStats.fetched} details, ${detailStats.failed} detail failures`
+        : '';
+      console.log(`  📥 ${year}: fetched ${events.length} events from FurryCons.com${detailLog}`);
 
       for (const event of events) {
         try {
@@ -654,7 +821,7 @@ async function syncFurryConsCom(options = {}) {
     }
   }
 
-  console.log(`  ✅ FurryCons.com sync complete: ${stats.created} created, ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed`);
+  console.log(`  ✅ FurryCons.com sync complete: ${stats.created} created, ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed, ${stats.detailsFetched} details fetched, ${stats.detailsFailed} detail failures`);
   return stats;
 }
 
