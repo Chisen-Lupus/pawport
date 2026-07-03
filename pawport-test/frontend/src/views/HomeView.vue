@@ -464,8 +464,8 @@ function createScreenshotTrajectoryOverlay() {
   Object.assign(canvas.style, {
     position: 'absolute',
     inset: '0',
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
+    width: '100%',
+    height: '100%',
     pointerEvents: 'none',
     zIndex: '449',
   })
@@ -523,16 +523,17 @@ function createScreenshotAvatarFrame() {
   const avatar = document.createElement('span')
   avatar.className = 'screenshot-avatar'
   avatar.style.background = color
-  if (authStore.user?.avatar_url) {
-    const image = document.createElement('img')
-    image.src = new URL(authStore.user.avatar_url, window.location.origin).toString()
-    image.crossOrigin = 'anonymous'
-    image.alt = ''
-    avatar.appendChild(image)
+  const hasAvatarImage = Boolean(authStore.user?.avatar_url)
+  if (hasAvatarImage) {
+    avatar.style.backgroundImage = `url("${new URL(authStore.user.avatar_url, window.location.origin)}")`
+    avatar.style.backgroundPosition = 'center'
+    avatar.style.backgroundRepeat = 'no-repeat'
+    avatar.style.backgroundSize = 'cover'
   }
   const label = document.createElement('span')
   label.className = 'screenshot-avatar-label'
   label.textContent = name[0] || 'P'
+  label.style.visibility = hasAvatarImage ? 'hidden' : ''
   avatar.appendChild(label)
 
   const text = document.createElement('span')
@@ -2449,15 +2450,6 @@ watch(
   font-size: 1.55em;
   font-weight: 900;
   overflow: hidden;
-}
-
-:global(.screenshot-avatar img) {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 :global(.screenshot-avatar-label) {
