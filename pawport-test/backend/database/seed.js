@@ -1,13 +1,33 @@
 const bcrypt = require('bcryptjs');
 const { sequelize, User, Con, Hotel, UserCon, UserConHotel } = require('./init');
 
+const TEST_NAME_SUFFIX = ' [测试]';
+
+function testName(value) {
+  if (!value) return value;
+  const cleaned = String(value)
+    .replace(/\s*(?:\(|（)(?:测试|test)(?:\)|）)\s*$/i, '')
+    .trim();
+  return cleaned.endsWith(TEST_NAME_SUFFIX) ? cleaned : `${cleaned}${TEST_NAME_SUFFIX}`;
+}
+
+function tagTestRecords(records, fields) {
+  return records.map(record => {
+    if (!record.is_test) return record;
+    return fields.reduce((tagged, field) => ({
+      ...tagged,
+      [field]: testName(tagged[field]),
+    }), { ...record });
+  });
+}
+
 async function seed() {
   try {
     await sequelize.authenticate();
     console.log('🌱 Starting database seeding...');
     
     // Create test hotels
-    const hotels = await Hotel.bulkCreate([
+    const hotels = await Hotel.bulkCreate(tagTestRecords([
       {
         name: '广州花园酒店',
         address: '广东省广州市越秀区环市东路368号',
@@ -98,12 +118,12 @@ async function seed() {
         longitude: 113.3245,
         is_test: true,
       },
-    ]);
+    ], ['name']));
     console.log(`  ✅ Created ${hotels.length} test hotels`);
 
     // Create test cons (including one currently active con for testing)
     const now = new Date();
-    const cons = await Con.bulkCreate([
+    const cons = await Con.bulkCreate(tagTestRecords([
       {
         name: '极兽聚',
         name_en: 'Polarfur',
@@ -306,12 +326,12 @@ async function seed() {
         status: 'approved',
         is_test: true,
       },
-    ]);
+    ], ['name', 'name_en', 'name_local', 'series_name']));
     console.log(`  ✅ Created ${cons.length} test cons`);
 
     // Create test users
     const passwordHash = await bcrypt.hash('test123456', 10);
-    const users = await User.bulkCreate([
+    const users = await User.bulkCreate(tagTestRecords([
       {
         username: 'foxfire',
         email: 'foxfire@test.com',
@@ -374,7 +394,7 @@ async function seed() {
         is_test: true,
         role: 'admin',
       },
-    ]);
+    ], ['display_name']));
     const extraUsers = await User.bulkCreate(
       Array.from({ length: 18 }, (_, index) => {
         const number = String(index + 1).padStart(2, '0');
@@ -383,7 +403,7 @@ async function seed() {
           username: `visitor${number}`,
           email: `visitor${number}@test.com`,
           password_hash: passwordHash,
-          display_name: `旅客${number}`,
+          display_name: testName(`旅客${number}`),
           theme_color: palette[index % palette.length],
           bio: '当前展头像列表测试用户',
           show_on_homepage: true,

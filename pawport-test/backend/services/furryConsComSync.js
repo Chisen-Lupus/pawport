@@ -268,6 +268,93 @@ function sourceUrlForCon(con) {
   return normalizeFurryConsUrl(con?.extra_fields?.sourceUrl || con?.website);
 }
 
+function normalizeLocationText(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isGreaterChinaCountry(country) {
+  const normalized = normalizeLocationText(country);
+  return [
+    'china',
+    'cn',
+    'prc',
+    'people\'s republic of china',
+    '中国',
+    'hong kong',
+    'hk',
+    '香港',
+    'macau',
+    'macao',
+    'mo',
+    '澳门',
+    '澳門',
+    'taiwan',
+    'tw',
+    '台湾',
+    '臺灣',
+  ].includes(normalized);
+}
+
+function isGreaterChinaLocation(location = {}) {
+  if (isGreaterChinaCountry(location.country)) return true;
+
+  const text = [
+    location.city,
+    location.region,
+    location.address,
+  ].map(normalizeLocationText).filter(Boolean).join(' ');
+
+  return [
+    '香港',
+    '澳门',
+    '澳門',
+    '台湾',
+    '臺灣',
+    'hong kong',
+    'macau',
+    'macao',
+    'taiwan',
+  ].some(token => text.includes(token));
+}
+
+async function rejectExistingGreaterChinaCon(fccId, reason = 'greater-china-source') {
+  if (!fccId) return 0;
+
+  const con = await Con.findOne({ where: { fcc_id: fccId } });
+  if (!con) return 0;
+
+  await con.update({
+    status: 'rejected',
+    extra_fields: {
+      ...(con.extra_fields || {}),
+      ignoredBySourcePolicy: true,
+      ignoredReason: reason,
+      ignoredAt: new Date().toISOString(),
+    },
+  });
+
+  return 1;
+}
+
+async function rejectGreaterChinaFurryConsComRecords() {
+  const cons = await Con.findAll({
+    where: {
+      fcc_id: { [Op.like]: `${SOURCE_PREFIX}%` },
+      status: { [Op.ne]: 'rejected' },
+    },
+    attributes: ['id', 'fcc_id', 'city', 'country', 'address', 'extra_fields', 'status'],
+  });
+
+  let rejected = 0;
+  for (const con of cons) {
+    if (isGreaterChinaLocation(con)) {
+      rejected += await rejectExistingGreaterChinaCon(con.fcc_id);
+    }
+  }
+
+  return rejected;
+}
+
 function extractJsonLdScripts(html) {
   const scripts = [];
   const regex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -631,6 +718,7 @@ function eventFromCon(con) {
 function shouldBackfillConDetail(con, requestedFccIds = null) {
   if (!sourceUrlForCon(con)) return false;
   if (requestedFccIds && !requestedFccIds.has(con.fcc_id)) return false;
+  if (isGreaterChinaLocation(con)) return false;
   return precisionRank(con.extra_fields?.locationPrecision) < precisionRank('geo');
 }
 
@@ -667,9 +755,11 @@ async function backfillFurryConsComDetails(options = {}) {
     skipped: 0,
     failed: 0,
     rateLimited: false,
+    rejectedGreaterChina: 0,
   };
 
   console.log(`🔄 Starting FurryCons.com detail backfill (${cons.length} records)...`);
+  stats.rejectedGreaterChina += await rejectGreaterChinaFurryConsComRecords();
 
   for (const con of cons) {
     const listEvent = eventFromCon(con);
@@ -699,7 +789,7 @@ async function backfillFurryConsComDetails(options = {}) {
     }
   }
 
-  console.log(`  ✅ FurryCons.com detail backfill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed`);
+  console.log(`  ✅ FurryCons.com detail backfill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed, ${stats.rejectedGreaterChina} existing Greater China records rejected`);
   return stats;
 }
 
@@ -882,9 +972,12 @@ async function syncFurryConsCom(options = {}) {
     failed: 0,
     detailsFetched: 0,
     detailsFailed: 0,
+    ignoredGreaterChina: 0,
+    rejectedGreaterChina: 0,
   };
 
   console.log(`🔄 Starting FurryCons.com calendar sync (${fromYear}-${toYear})...`);
+  stats.rejectedGreaterChina += await rejectGreaterChinaFurryConsComRecords();
 
   for (let year = fromYear; year <= toYear; year++) {
     try {
@@ -906,6 +999,12 @@ async function syncFurryConsCom(options = {}) {
             continue;
           }
 
+          if (isGreaterChinaLocation(conData)) {
+            stats.ignoredGreaterChina++;
+            stats.rejectedGreaterChina += await rejectExistingGreaterChinaCon(conData.fcc_id);
+            continue;
+          }
+
           const result = await upsertCon(conData);
           stats[result]++;
         } catch (eventError) {
@@ -923,7 +1022,7 @@ async function syncFurryConsCom(options = {}) {
     }
   }
 
-  console.log(`  ✅ FurryCons.com sync complete: ${stats.created} created, ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed, ${stats.detailsFetched} details fetched, ${stats.detailsFailed} detail failures`);
+  console.log(`  ✅ FurryCons.com sync complete: ${stats.created} created, ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed, ${stats.detailsFetched} details fetched, ${stats.detailsFailed} detail failures, ${stats.ignoredGreaterChina} Greater China records ignored, ${stats.rejectedGreaterChina} existing records rejected`);
   return stats;
 }
 
