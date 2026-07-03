@@ -65,6 +65,10 @@
       <section class="panel-section">
         <h4>{{ $t('user.conHistory') }}</h4>
         <p class="history-hint">{{ $t('user.conHistoryHint') }}</p>
+
+        <button class="btn btn-outline btn-full" @click="showAddCon = true">
+          + {{ $t('con.addCon') }}
+        </button>
         
         <div class="my-cons">
           <article v-for="uc in userCons" :key="uc.id" class="my-con-item">
@@ -201,10 +205,6 @@
             </div>
           </article>
         </div>
-        
-        <button class="btn btn-outline btn-full" @click="showAddCon = true">
-          + {{ $t('con.addCon') }}
-        </button>
       </section>
       
       <!-- Add Con Modal -->
@@ -613,11 +613,25 @@ async function uploadNewConAvatar(conId) {
 async function fetchUserCons() {
   try {
     const res = await api.get(`/users/${authStore.user.id}`)
-    userCons.value = res.data.user.cons || []
+    userCons.value = sortVisitsByConDateDesc(res.data.user.cons || [])
     syncHotelEditors()
   } catch (error) {
     console.warn('Failed to fetch user cons')
   }
+}
+
+function visitStartTime(visit) {
+  const time = new Date(visit.Con?.start_date || 0).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+function sortVisitsByConDateDesc(visits) {
+  return [...visits].sort((a, b) => {
+    const aTime = visitStartTime(a)
+    const bTime = visitStartTime(b)
+    if (aTime !== bTime) return bTime - aTime
+    return (b.visit_order || 0) - (a.visit_order || 0)
+  })
 }
 
 async function searchCons() {

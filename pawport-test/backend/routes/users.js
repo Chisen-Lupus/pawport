@@ -13,6 +13,10 @@ function compareVisitsByConDate(a, b) {
   return (a.visit_order || 0) - (b.visit_order || 0);
 }
 
+function compareVisitsByConDateDesc(a, b) {
+  return compareVisitsByConDate(b, a);
+}
+
 function visibleUserWhere(req) {
   const where = { show_on_homepage: true };
   if (!shouldIncludeTestData(req, appConfig.features.showTestUsers)) {
@@ -118,7 +122,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     if (user.show_con_history || isOwner) {
       response.cons = user.UserCons
-        ? [...user.UserCons].filter(uc => uc.Con).sort(compareVisitsByConDate)
+        ? [...user.UserCons].filter(uc => uc.Con).sort(compareVisitsByConDateDesc)
         : [];
     }
 
