@@ -11,7 +11,7 @@ const router = express.Router();
 const backendRoot = path.resolve(__dirname, '..');
 const uploadsRoot = path.join(backendRoot, 'uploads');
 const cacheRoot = path.join(backendRoot, 'data', 'thumb-cache');
-const allowedImageHosts = new Set(['images.furrycons.cn']);
+const allowedImageHosts = new Set(['images.furrycons.cn', 'media.animecons.com']);
 
 fs.mkdirSync(cacheRoot, { recursive: true });
 

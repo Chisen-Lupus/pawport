@@ -11,6 +11,7 @@ module.exports = {
     showTestUsers: true,
     showTestCons: true,
     enableFCCSync: true,
+    enableFurryConsComSync: true,
     enableAnimations: true,
     enableTrajectories: true,
     enableOAuth: false,
@@ -49,5 +50,13 @@ module.exports = {
     pageSize: 100,
     maxPages: 50,
     syncInterval: 24 * 60 * 60 * 1000,
+  },
+  furryConsCom: {
+    baseUrl: 'https://furrycons.com',
+    calendarPath: '/calendar/calendar.php',
+    startYear: 1989,
+    futureYears: 1,
+    requestDelayMs: 250,
+    syncCron: '0 4 1 * *',
   },
 };

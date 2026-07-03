@@ -11,6 +11,7 @@ const appConfig = require('../config/app.config');
 const secretsConfig = require('../config/secrets.config');
 const { sequelize } = require('./database/init');
 const { syncFCC } = require('./services/fccSync');
+const { syncFurryConsCom } = require('./services/furryConsComSync');
 
 const app = express();
 
@@ -92,6 +93,22 @@ async function start() {
           console.error('⚠️ Initial FCC sync failed:', error.message);
         });
       }, 1000);
+    }
+
+    if (appConfig.features.enableFurryConsComSync) {
+      const cronRule = appConfig.furryConsCom?.syncCron || '0 4 1 * *';
+      cron.schedule(cronRule, () => {
+        console.log('🔄 Running scheduled FurryCons.com sync...');
+        syncFurryConsCom();
+      });
+      console.log(`✅ FurryCons.com sync scheduled (${cronRule})`);
+
+      setTimeout(() => {
+        console.log('🔄 Running initial FurryCons.com sync...');
+        syncFurryConsCom().catch(error => {
+          console.error('⚠️ Initial FurryCons.com sync failed:', error.message);
+        });
+      }, 5000);
     }
     
     const host = appConfig.env === 'development' ? appConfig.local.host : '0.0.0.0';

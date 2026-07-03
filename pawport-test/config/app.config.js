@@ -26,6 +26,7 @@ module.exports = {
 
   // FCC同步配置
   fcc: siteConfig.fcc,
+  furryConsCom: siteConfig.furryConsCom,
 
   // 地图配置
   map: siteConfig.map,
