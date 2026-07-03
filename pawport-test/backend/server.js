@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const path = require('path');
 const cron = require('node-cron');
 
-require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+require('./utils/loadEnv')();
 
 const appConfig = require('../config/app.config');
 const secretsConfig = require('../config/secrets.config');

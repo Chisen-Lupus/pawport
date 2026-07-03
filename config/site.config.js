@@ -43,6 +43,7 @@ module.exports = {
     detailPath: '/event',
     keepOld: true,
     fetchDetails: false,
+    syncFrom: '2015-01-01T00:00:00.000Z',
     syncPastMonths: 84,
     syncFutureMonths: 18,
     pageSize: 100,

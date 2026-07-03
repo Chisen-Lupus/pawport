@@ -2,7 +2,7 @@ const { Sequelize } = require('sequelize');
 const fs = require('fs');
 const path = require('path');
 
-require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
+require('../utils/loadEnv')();
 
 const secretsConfig = require('../../config/secrets.config');
 const appConfig = require('../../config/app.config');
