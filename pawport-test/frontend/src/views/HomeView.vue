@@ -389,10 +389,12 @@ async function downloadCurrentView() {
   if (!mapContainer.value || isCapturingView.value) return
 
   isCapturingView.value = true
+  let cleanupCapture = null
   try {
     map?.invalidateSize()
     await nextTick()
     if (document.fonts?.ready) await document.fonts.ready
+    cleanupCapture = prepareScreenshotCapture()
     await waitForNextFrame()
 
     const canvas = await html2canvas(mapContainer.value, {
@@ -403,15 +405,146 @@ async function downloadCurrentView() {
       scale: Math.min(2, window.devicePixelRatio || 1),
       useCORS: true,
     })
+    cleanupCapture?.()
+    cleanupCapture = null
 
-    await drawAvatarFrame(canvas)
     await downloadCanvas(canvas, screenshotFilename())
   } catch (error) {
     console.warn('Failed to download map screenshot:', error)
     window.alert(themeStore.locale === 'zh' ? '截图生成失败，请稍后再试。' : 'Screenshot failed. Please try again.')
   } finally {
+    cleanupCapture?.()
     isCapturingView.value = false
   }
+}
+
+function prepareScreenshotCapture() {
+  const cleanups = [
+    hideElementsForScreenshot('.trajectory-line'),
+    createScreenshotTrajectoryOverlay(),
+    createScreenshotAvatarFrame(),
+  ].filter(Boolean)
+
+  return () => {
+    cleanups.reverse().forEach(cleanup => cleanup())
+  }
+}
+
+function hideElementsForScreenshot(selector) {
+  if (!mapContainer.value) return null
+
+  const elements = Array.from(mapContainer.value.querySelectorAll(selector))
+  const previous = elements.map(element => ({
+    element,
+    visibility: element.style.visibility,
+  }))
+
+  elements.forEach(element => {
+    element.style.visibility = 'hidden'
+  })
+
+  return () => {
+    previous.forEach(({ element, visibility }) => {
+      element.style.visibility = visibility
+    })
+  }
+}
+
+function createScreenshotTrajectoryOverlay() {
+  if (!mapContainer.value || !map || !showTrajectories.value) return null
+
+  const rect = mapContainer.value.getBoundingClientRect()
+  if (!rect.width || !rect.height) return null
+
+  const canvas = document.createElement('canvas')
+  const ratio = Math.min(2, window.devicePixelRatio || 1)
+  canvas.width = Math.round(rect.width * ratio)
+  canvas.height = Math.round(rect.height * ratio)
+  canvas.className = 'screenshot-trajectory-overlay'
+  Object.assign(canvas.style, {
+    position: 'absolute',
+    inset: '0',
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    pointerEvents: 'none',
+    zIndex: '449',
+  })
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.scale(ratio, ratio)
+  drawScreenshotTrajectoryLines(ctx)
+  mapContainer.value.appendChild(canvas)
+
+  return () => canvas.remove()
+}
+
+function drawScreenshotTrajectoryLines(ctx) {
+  const segmentCounts = collectSegmentCounts(trajectoryUsers.value)
+  const opacity = myConIds.value.size ? 0.72 : 0.56
+
+  trajectoryUsers.value.forEach(user => {
+    getUserTrajectorySegments(user, segmentCounts).forEach(segment => {
+      const points = generateCurve(segment.start, segment.end)
+        .map(latLng => map.latLngToContainerPoint(latLng))
+      if (points.length < 2) return
+
+      ctx.save()
+      ctx.beginPath()
+      ctx.moveTo(points[0].x, points[0].y)
+      points.slice(1).forEach(point => ctx.lineTo(point.x, point.y))
+      ctx.lineWidth = Math.min(9, 2 + segment.count)
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.globalAlpha = opacity
+      ctx.strokeStyle = segment.color
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.18)'
+      ctx.shadowBlur = 3
+      ctx.shadowOffsetY = 2
+      ctx.stroke()
+      ctx.restore()
+    })
+  })
+}
+
+function createScreenshotAvatarFrame() {
+  if (!mapContainer.value) return null
+
+  const color = authStore.user?.theme_color || '#6C63FF'
+  const name = displayName(authStore.user) || 'PawPort'
+  const subtitle = authStore.user?.username
+    ? `@${authStore.user.username}`
+    : (themeStore.locale === 'zh' ? '兽展护照' : 'Furry Con Passport')
+  const frame = document.createElement('div')
+  frame.className = 'screenshot-avatar-frame'
+  frame.style.borderColor = color
+  frame.style.background = themeStore.darkMode ? 'rgba(15, 23, 42, 0.88)' : 'rgba(255, 255, 255, 0.9)'
+
+  const avatar = document.createElement('span')
+  avatar.className = 'screenshot-avatar'
+  avatar.style.background = color
+  if (authStore.user?.avatar_url) {
+    const image = document.createElement('img')
+    image.src = new URL(authStore.user.avatar_url, window.location.origin).toString()
+    image.crossOrigin = 'anonymous'
+    image.alt = ''
+    avatar.appendChild(image)
+  }
+  const label = document.createElement('span')
+  label.className = 'screenshot-avatar-label'
+  label.textContent = name[0] || 'P'
+  avatar.appendChild(label)
+
+  const text = document.createElement('span')
+  text.className = 'screenshot-avatar-text'
+  text.style.color = themeStore.darkMode ? '#F8FAFC' : '#111827'
+  text.innerHTML = `<strong>${escapeHtml(name)}</strong><small>${escapeHtml(subtitle)}</small>`
+
+  frame.appendChild(avatar)
+  frame.appendChild(text)
+  mapContainer.value.appendChild(frame)
+
+  return () => frame.remove()
 }
 
 function waitForNextFrame() {
@@ -2282,6 +2415,79 @@ watch(
   color: var(--text);
   box-shadow: var(--shadow);
   font-weight: 800;
+}
+
+:global(.screenshot-avatar-frame) {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(330px, calc(100% - 44px));
+  min-height: 90px;
+  padding: 13px 15px;
+  border: 1.5px solid var(--user-primary, var(--primary));
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+:global(.screenshot-avatar) {
+  position: relative;
+  flex: 0 0 62px;
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border: 4px solid #FFFFFF;
+  border-radius: 50%;
+  color: #FFFFFF;
+  font-size: 1.55em;
+  font-weight: 900;
+  overflow: hidden;
+}
+
+:global(.screenshot-avatar img) {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:global(.screenshot-avatar-label) {
+  position: relative;
+  z-index: 1;
+}
+
+:global(.screenshot-avatar-text) {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+:global(.screenshot-avatar-text strong),
+:global(.screenshot-avatar-text small) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.screenshot-avatar-text strong) {
+  color: var(--text);
+  font-size: 1.08em;
+}
+
+:global(.screenshot-avatar-text small) {
+  color: var(--text-secondary);
+  font-size: 0.76em;
+  font-weight: 700;
 }
 
 :global(.map-label) {
