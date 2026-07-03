@@ -307,8 +307,31 @@ const scopedCons = computed(() => {
     : base
 })
 
+const trajectorySourceContext = computed(() => {
+  const sourceCons = scopedCons.value
+  return {
+    sourceIds: new Set(sourceCons.map(con => con.id)),
+    sourceConById: new Map(sourceCons.map(con => [con.id, con])),
+  }
+})
+
+const trajectorySourceNodeIds = computed(() => {
+  const context = trajectorySourceContext.value
+  const nodeIds = new Set()
+
+  trajectoryUsers.value.forEach(user => {
+    const visits = getSortedSourceTrajectoryVisits(user, context)
+    if (visits.length < 2) return
+    visits.forEach(visit => nodeIds.add(visit.Con.id))
+  })
+
+  return nodeIds
+})
+
 const candidateCons = computed(() => {
-  return mergeConSeries.value ? mergeSeriesCons(scopedCons.value) : scopedCons.value
+  if (!mergeConSeries.value) return scopedCons.value
+  const preferredIds = hideNoTrajectoryNodes.value ? trajectorySourceNodeIds.value : null
+  return mergeSeriesCons(scopedCons.value, preferredIds)
 })
 
 const trajectoryDisplayContext = computed(() => {
@@ -821,7 +844,7 @@ function shiftDateRange(months) {
   mapFilters.to = toDateInput(addMonths(parseDateInput(mapFilters.to, fallback.to), months))
 }
 
-function mergeSeriesCons(cons) {
+function mergeSeriesCons(cons, preferredIds = null) {
   const groups = new Map()
   const merged = []
 
@@ -837,7 +860,11 @@ function mergeSeriesCons(cons) {
   })
 
   groups.forEach(group => {
-    merged.push([...group].sort(compareSeriesRepresentatives)[0])
+    const preferredGroup = preferredIds
+      ? group.filter(con => preferredIds.has(con.id))
+      : []
+    const representatives = preferredGroup.length ? preferredGroup : group
+    merged.push([...representatives].sort(compareSeriesRepresentatives)[0])
   })
 
   return merged
@@ -1353,6 +1380,9 @@ async function renderTrajectories() {
 
   try {
     await loadTrajectoryUsers()
+    if (hideNoTrajectoryNodes.value) {
+      renderMarkers()
+    }
     const segmentCounts = collectSegmentCounts(trajectoryUsers.value)
     trajectoryUsers.value.forEach(user => drawUserTrajectory(user, segmentCounts))
   } catch (error) {
@@ -1409,6 +1439,39 @@ function getSortedTrajectoryVisits(user, context = trajectoryDisplayContext.valu
     if (index === 0) return true
     return visit.Con.id !== visits[index - 1].Con.id
   })
+}
+
+function getSortedSourceTrajectoryVisits(user, context = trajectorySourceContext.value) {
+  if (!canShowTrajectory(user)) return []
+
+  const visits = getTrajectoryVisits(user)
+    .map(visit => normalizeSourceTrajectoryVisit(visit, context))
+    .filter(Boolean)
+    .sort(compareVisitsByConDate)
+
+  return visits.filter((visit, index) => {
+    if (index === 0) return true
+    return visit.Con.id !== visits[index - 1].Con.id
+  })
+}
+
+function normalizeSourceTrajectoryVisit(visit, context) {
+  const rawCon = visit.Con
+  if (!rawCon || !context.sourceIds.has(rawCon.id)) return null
+
+  const sourceCon = context.sourceConById.get(rawCon.id) || rawCon
+  const actualCon = {
+    ...sourceCon,
+    ...rawCon,
+    series_key: rawCon.series_key || sourceCon.series_key,
+    series_name: rawCon.series_name || sourceCon.series_name,
+  }
+  if (!hasConCoordinates(actualCon)) return null
+
+  return {
+    ...visit,
+    Con: actualCon,
+  }
 }
 
 function normalizeTrajectoryVisit(visit, context) {
