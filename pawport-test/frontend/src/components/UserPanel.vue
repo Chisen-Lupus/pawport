@@ -593,6 +593,10 @@ function notifyProfileUpdated(user = authStore.user) {
   window.dispatchEvent(new CustomEvent('pawport-profile-updated', { detail: { user } }))
 }
 
+function notifyAttendanceUpdated(conId, attending = null) {
+  window.dispatchEvent(new CustomEvent('pawport-attendance-updated', { detail: { conId, attending } }))
+}
+
 function selectNewConAvatar(event) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -676,6 +680,7 @@ async function addToCon(con) {
   showAddCon.value = false
   selectedCon.value = null
   await consStore.fetchMapCons()
+  notifyAttendanceUpdated(con.id, true)
 }
 
 function selectConForAttendance(con) {
@@ -959,7 +964,7 @@ async function saveHistoryHotel(visit) {
     editor.open = false
     await fetchUserCons()
     await consStore.fetchMapCons()
-    window.dispatchEvent(new CustomEvent('pawport-attendance-updated', { detail: { conId: visit.con_id } }))
+    notifyAttendanceUpdated(visit.con_id, true)
   } catch (error) {
     console.error('Failed to save hotels:', error)
   } finally {
@@ -1058,6 +1063,7 @@ async function removeFromCon(conId) {
     await consStore.removeAttendance(conId)
     await fetchUserCons()
     await consStore.fetchMapCons()
+    notifyAttendanceUpdated(conId, false)
   } catch (error) {
     console.error('Failed to remove con:', error)
   }
@@ -1074,6 +1080,7 @@ async function submitNewCon() {
     await consStore.markAttendance(con.id, buildAttendancePayload())
     await fetchUserCons()
     await consStore.fetchMapCons()
+    notifyAttendanceUpdated(con.id, true)
     showAddCon.value = false
     selectedCon.value = null
     newConAvatarFile.value = null

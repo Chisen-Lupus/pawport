@@ -1019,12 +1019,17 @@ async function syncConHotelStats(conId) {
   }
 }
 
-function handleAttendanceUpdated(event) {
+async function handleAttendanceUpdated(event) {
   const conId = event.detail?.conId
   if (!conId) return
 
-  syncConAttendees(conId)
-  syncConHotelStats(conId)
+  await Promise.all([
+    syncConAttendees(conId).catch(() => null),
+    syncConHotelStats(conId),
+    loadMyCons(),
+  ])
+  renderMarkers()
+  await refreshCurrentUserTrajectory()
 }
 
 function currentUserPatch() {
