@@ -11,6 +11,10 @@
         <span class="control-icon">•</span>
         <span class="control-label">{{ hideNoTrajectoryNodes ? $t('map.showNoTrajectoryNodes') : $t('map.hideNoTrajectoryNodes') }}</span>
       </button>
+      <button class="control-btn" @click="toggleSeriesMerge" :class="{ active: mergeConSeries }">
+        <span class="control-icon">≋</span>
+        <span class="control-label">{{ mergeConSeries ? $t('map.splitSeriesCons') : $t('map.mergeSeriesCons') }}</span>
+      </button>
       <button
         v-if="authStore.isLoggedIn"
         class="control-btn"
@@ -209,6 +213,7 @@ const themeStore = useThemeStore()
 const mapContainer = ref(null)
 const showTrajectories = ref(true)
 const hideNoTrajectoryNodes = ref(false)
+const mergeConSeries = ref(true)
 const showOnlyMine = ref(false)
 const showActiveCallouts = ref(true)
 const windows = ref([])
@@ -291,10 +296,10 @@ const mapLabels = [
 
 const candidateCons = computed(() => {
   const base = consStore.mapCons.filter(conMatchesFilters)
-  if (showOnlyMine.value && authStore.isLoggedIn) {
-    return base.filter(con => myConIds.value.has(con.id))
-  }
-  return base
+  const scoped = showOnlyMine.value && authStore.isLoggedIn
+    ? base.filter(con => myConIds.value.has(con.id))
+    : base
+  return mergeConSeries.value ? mergeSeriesCons(scoped) : scoped
 })
 
 const trajectoryNodeIds = computed(() => {
@@ -385,6 +390,12 @@ function toggleOnlyMine() {
   renderTrajectories()
 }
 
+function toggleSeriesMerge() {
+  mergeConSeries.value = !mergeConSeries.value
+  renderMarkers()
+  renderTrajectories()
+}
+
 async function toggleNoTrajectoryNodes() {
   hideNoTrajectoryNodes.value = !hideNoTrajectoryNodes.value
   if (hideNoTrajectoryNodes.value && !trajectoryUsers.value.length) {
@@ -426,6 +437,66 @@ function shiftDateRange(months) {
   const fallback = defaultFilters()
   mapFilters.from = toDateInput(addMonths(parseDateInput(mapFilters.from, fallback.from), months))
   mapFilters.to = toDateInput(addMonths(parseDateInput(mapFilters.to, fallback.to), months))
+}
+
+function mergeSeriesCons(cons) {
+  const groups = new Map()
+  const merged = []
+
+  cons.forEach(con => {
+    const key = conSeriesKey(con)
+    if (!key) {
+      merged.push(con)
+      return
+    }
+
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(con)
+  })
+
+  groups.forEach(group => {
+    merged.push([...group].sort(compareSeriesRepresentatives)[0])
+  })
+
+  return merged
+}
+
+function conSeriesKey(con) {
+  const seriesKey = String(con.series_key || '').trim()
+  if (seriesKey) return `key:${seriesKey}`
+
+  const seriesName = normalizeSeriesText(con.series_name)
+  return seriesName ? `name:${seriesName}` : ''
+}
+
+function normalizeSeriesText(value = '') {
+  return String(value).replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function compareSeriesRepresentatives(a, b) {
+  const activeScore = Number(Boolean(b.isActive)) - Number(Boolean(a.isActive))
+  if (activeScore !== 0) return activeScore
+
+  const aDistance = conDistanceFromNow(a)
+  const bDistance = conDistanceFromNow(b)
+  if (aDistance !== bDistance) return aDistance - bDistance
+
+  const aTime = new Date(a.start_date || 0).getTime()
+  const bTime = new Date(b.start_date || 0).getTime()
+  if (aTime !== bTime) return bTime - aTime
+
+  return String(a.name || '').localeCompare(String(b.name || ''), themeStore.locale === 'zh' ? 'zh-Hans-CN' : 'en')
+}
+
+function conDistanceFromNow(con) {
+  const now = Date.now()
+  const start = new Date(`${con.start_date || ''}T00:00:00`).getTime()
+  const end = new Date(`${con.end_date || con.start_date || ''}T23:59:59`).getTime()
+
+  if (!Number.isFinite(start)) return Number.MAX_SAFE_INTEGER
+  if (Number.isFinite(end) && now >= start && now <= end) return 0
+  if (now < start) return start - now
+  return now - (Number.isFinite(end) ? end : start)
 }
 
 function startDrag(event, windowItem) {

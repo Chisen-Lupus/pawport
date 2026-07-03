@@ -24,6 +24,8 @@
     "hideTrajectories": "Hide Trajectories",
     "hideNoTrajectoryNodes": "Hide No-Trajectory Nodes",
     "showNoTrajectoryNodes": "Show No-Trajectory Nodes",
+    "mergeSeriesCons": "Merge Series",
+    "splitSeriesCons": "Split Series",
     "onlyMine": "Only Mine",
     "showAllCons": "Show All",
     "clearWindows": "Clear Windows",

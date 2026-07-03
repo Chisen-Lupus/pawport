@@ -24,6 +24,8 @@
     "hideTrajectories": "隐藏轨迹",
     "hideNoTrajectoryNodes": "隐藏无轨迹节点",
     "showNoTrajectoryNodes": "显示无轨迹节点",
+    "mergeSeriesCons": "合并同系列",
+    "splitSeriesCons": "展开同系列",
     "onlyMine": "只看我的",
     "showAllCons": "显示全部",
     "clearWindows": "清除窗口",
