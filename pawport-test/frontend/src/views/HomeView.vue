@@ -28,6 +28,10 @@
         <span class="control-icon">×</span>
         <span class="control-label">{{ $t('map.clearWindows') }}</span>
       </button>
+      <button class="control-btn" @click="downloadCurrentView" :disabled="isCapturingView">
+        <span class="control-icon">▣</span>
+        <span class="control-label">{{ isCapturingView ? $t('map.screenshotPreparing') : $t('map.downloadScreenshot') }}</span>
+      </button>
       <div class="filter-controls">
         <select v-model="mapFilters.region" :aria-label="$t('map.region')">
           <option value="all">{{ $t('map.regionAll') }}</option>
@@ -204,6 +208,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useConsStore } from '@/stores/cons'
 import { useThemeStore } from '@/stores/theme'
 import api from '@/utils/api'
+import html2canvas from 'html2canvas'
 import L from 'leaflet'
 
 const authStore = useAuthStore()
@@ -216,6 +221,7 @@ const hideNoTrajectoryNodes = ref(false)
 const mergeConSeries = ref(true)
 const showOnlyMine = ref(false)
 const showActiveCallouts = ref(true)
+const isCapturingView = ref(false)
 const windows = ref([])
 const myConIds = ref(new Set())
 const draggingWindowId = ref(null)
@@ -377,6 +383,191 @@ function closeWindow(id) {
 
 function clearWindows() {
   windows.value = []
+}
+
+async function downloadCurrentView() {
+  if (!mapContainer.value || isCapturingView.value) return
+
+  isCapturingView.value = true
+  try {
+    map?.invalidateSize()
+    await nextTick()
+    if (document.fonts?.ready) await document.fonts.ready
+    await waitForNextFrame()
+
+    const canvas = await html2canvas(mapContainer.value, {
+      backgroundColor: themeStore.darkMode ? '#05070B' : '#F8FAFC',
+      ignoreElements: element => element.classList?.contains('leaflet-control-container'),
+      imageTimeout: 15000,
+      logging: false,
+      scale: Math.min(2, window.devicePixelRatio || 1),
+      useCORS: true,
+    })
+
+    await drawAvatarFrame(canvas)
+    await downloadCanvas(canvas, screenshotFilename())
+  } catch (error) {
+    console.warn('Failed to download map screenshot:', error)
+    window.alert(themeStore.locale === 'zh' ? '截图生成失败，请稍后再试。' : 'Screenshot failed. Please try again.')
+  } finally {
+    isCapturingView.value = false
+  }
+}
+
+function waitForNextFrame() {
+  return new Promise(resolve => requestAnimationFrame(() => resolve()))
+}
+
+function screenshotFilename() {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  return `pawport-map-${stamp}.png`
+}
+
+async function downloadCanvas(canvas, filename) {
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+  const link = document.createElement('a')
+  link.download = filename
+
+  if (blob) {
+    const url = URL.createObjectURL(blob)
+    link.href = url
+    link.click()
+    URL.revokeObjectURL(url)
+    return
+  }
+
+  link.href = canvas.toDataURL('image/png')
+  link.click()
+}
+
+async function drawAvatarFrame(canvas) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const scale = canvas.width / Math.max(1, mapContainer.value?.clientWidth || canvas.width)
+  const color = authStore.user?.theme_color || '#6C63FF'
+  const name = displayName(authStore.user) || 'PawPort'
+  const subtitle = authStore.user?.username
+    ? `@${authStore.user.username}`
+    : (themeStore.locale === 'zh' ? '兽展护照' : 'Furry Con Passport')
+  const pad = 22 * scale
+  const cardPadding = 14 * scale
+  const avatarSize = 62 * scale
+  const cardWidth = Math.min(330 * scale, canvas.width - pad * 2)
+  const cardHeight = 90 * scale
+  const x = canvas.width - cardWidth - pad
+  const y = canvas.height - cardHeight - pad
+  const avatarX = x + cardPadding
+  const avatarY = y + (cardHeight - avatarSize) / 2
+  const textX = avatarX + avatarSize + 14 * scale
+  const textWidth = cardWidth - (textX - x) - cardPadding
+
+  ctx.save()
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.28)'
+  ctx.shadowBlur = 18 * scale
+  ctx.shadowOffsetY = 8 * scale
+  roundedRect(ctx, x, y, cardWidth, cardHeight, 22 * scale)
+  ctx.fillStyle = themeStore.darkMode ? 'rgba(15, 23, 42, 0.86)' : 'rgba(255, 255, 255, 0.88)'
+  ctx.fill()
+  ctx.shadowColor = 'transparent'
+  ctx.lineWidth = 1.5 * scale
+  ctx.strokeStyle = color
+  ctx.stroke()
+  ctx.restore()
+
+  await drawAvatar(ctx, {
+    x: avatarX,
+    y: avatarY,
+    size: avatarSize,
+    color,
+    imageUrl: authStore.user?.avatar_url,
+    label: name[0] || 'P',
+  })
+
+  ctx.save()
+  ctx.fillStyle = themeStore.darkMode ? '#F8FAFC' : '#111827'
+  ctx.font = `${Math.round(20 * scale)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`
+  ctx.textBaseline = 'top'
+  drawFittedText(ctx, name, textX, y + 22 * scale, textWidth)
+  ctx.fillStyle = themeStore.darkMode ? 'rgba(226, 232, 240, 0.72)' : 'rgba(75, 85, 99, 0.82)'
+  ctx.font = `${Math.round(13 * scale)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`
+  drawFittedText(ctx, subtitle, textX, y + 52 * scale, textWidth)
+  ctx.restore()
+}
+
+async function drawAvatar(ctx, { x, y, size, color, imageUrl, label }) {
+  const radius = size / 2
+  const centerX = x + radius
+  const centerY = y + radius
+  const image = await loadCanvasImage(imageUrl)
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+  ctx.closePath()
+  ctx.clip()
+
+  if (image) {
+    ctx.drawImage(image, x, y, size, size)
+  } else {
+    ctx.fillStyle = color
+    ctx.fillRect(x, y, size, size)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.font = `${Math.round(size * 0.44)}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, centerX, centerY + size * 0.02)
+  }
+  ctx.restore()
+
+  ctx.save()
+  ctx.lineWidth = Math.max(3, size * 0.08)
+  ctx.strokeStyle = '#FFFFFF'
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, radius - ctx.lineWidth / 2, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.lineWidth = Math.max(2, size * 0.035)
+  ctx.strokeStyle = color
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, radius + ctx.lineWidth, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.restore()
+}
+
+function loadCanvasImage(source) {
+  if (!source) return Promise.resolve(null)
+
+  return new Promise(resolve => {
+    const image = new Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => resolve(image)
+    image.onerror = () => resolve(null)
+    image.src = new URL(source, window.location.origin).toString()
+  })
+}
+
+function drawFittedText(ctx, text, x, y, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) {
+    ctx.fillText(text, x, y)
+    return
+  }
+
+  let output = text
+  while (output.length > 1 && ctx.measureText(`${output}...`).width > maxWidth) {
+    output = output.slice(0, -1)
+  }
+  ctx.fillText(`${output}...`, x, y)
+}
+
+function roundedRect(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2)
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + width, y, x + width, y + height, r)
+  ctx.arcTo(x + width, y + height, x, y + height, r)
+  ctx.arcTo(x, y + height, x, y, r)
+  ctx.arcTo(x, y, x + width, y, r)
+  ctx.closePath()
 }
 
 function toggleActiveCallouts() {
@@ -753,6 +944,7 @@ function initMap() {
 
 function makeTile(url) {
   return L.tileLayer(url, {
+    crossOrigin: 'anonymous',
     subdomains: 'abcd',
     maxZoom: 19,
     className: themeStore.darkMode ? 'dark-tile' : 'light-tile',

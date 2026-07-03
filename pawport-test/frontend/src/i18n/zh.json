@@ -29,6 +29,8 @@
     "onlyMine": "只看我的",
     "showAllCons": "显示全部",
     "clearWindows": "清除窗口",
+    "downloadScreenshot": "下载截图",
+    "screenshotPreparing": "生成中",
     "region": "地区",
     "regionAll": "全部地区",
     "regionMainland": "中国大陆",
