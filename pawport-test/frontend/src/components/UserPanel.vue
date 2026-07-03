@@ -66,9 +66,184 @@
         <h4>{{ $t('user.conHistory') }}</h4>
         <p class="history-hint">{{ $t('user.conHistoryHint') }}</p>
 
-        <button class="btn btn-outline btn-full" @click="showAddCon = true">
-          + {{ $t('con.addCon') }}
+        <button
+          class="btn btn-outline btn-full add-con-toggle"
+          type="button"
+          :aria-expanded="showAddCon"
+          @click="toggleAddCon"
+        >
+          <span v-if="showAddCon">{{ $t('common.close') }} {{ $t('con.addCon') }}</span>
+          <span v-else>+ {{ $t('con.addCon') }}</span>
         </button>
+
+        <transition name="accordion">
+          <div class="add-con-modal" v-if="showAddCon">
+            <div class="modal-header">
+              <h4>{{ $t('con.addCon') }}</h4>
+              <button type="button" @click="closeAddCon">×</button>
+            </div>
+
+            <div class="form-group">
+              <label>{{ $t('common.search') }}</label>
+              <input v-model="searchQuery" type="text" @input="searchCons" placeholder="Search cons..." />
+            </div>
+
+            <div class="search-results">
+              <div
+                v-for="con in searchResults"
+                :key="con.id"
+                class="search-item"
+                @click="selectConForAttendance(con)"
+              >
+                <span>{{ con.name }}</span>
+                <span class="search-item-date">{{ con.start_date }}</span>
+              </div>
+            </div>
+
+            <div class="attendance-form" v-if="selectedCon">
+              <div class="selected-con">
+                <strong>{{ selectedCon.name }}</strong>
+                <button type="button" @click="selectedCon = null">×</button>
+              </div>
+
+              <div class="form-group">
+                <label>{{ $t('con.comment') }}</label>
+                <textarea v-model="attendanceForm.comment" rows="2"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label>{{ $t('con.rating') }}</label>
+                <select v-model="attendanceForm.rating">
+                  <option :value="null">-</option>
+                  <option v-for="score in [5, 4, 3, 2, 1]" :key="score" :value="score">{{ score }}</option>
+                </select>
+              </div>
+
+              <div class="hotel-editor">
+                <div class="hotel-editor-head">
+                  <label>{{ $t('con.hotel') }}</label>
+                  <button class="link-btn" type="button" @click="addHotelRow">+ {{ $t('con.addHotel') }}</button>
+                </div>
+                <div v-for="(hotel, index) in attendanceForm.hotels" :key="index" class="hotel-row">
+                  <label class="hotel-row-field">
+                    <span>{{ $t('hotel.name') }}</span>
+                    <input v-model="hotel.name" :placeholder="$t('hotel.name')" />
+                  </label>
+                  <label class="hotel-row-field">
+                    <span>
+                      {{ $t('hotel.address') }}
+                      <span class="field-optional">({{ $t('common.optional') }})</span>
+                    </span>
+                    <input v-model="hotel.address" :placeholder="$t('hotel.addressOptionalPlaceholder')" />
+                  </label>
+                  <div class="hotel-date-row">
+                    <input v-model="hotel.check_in" type="date" />
+                    <input v-model="hotel.check_out" type="date" />
+                    <button class="remove-hotel" type="button" @click="removeHotelRow(index)" :aria-label="$t('common.delete')">
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button class="btn btn-primary btn-full" type="button" @click="saveAttendance">
+                {{ $t('common.save') }}
+              </button>
+            </div>
+
+            <div class="divider"></div>
+            <button class="btn btn-outline btn-full" type="button" @click="showSubmitCon = !showSubmitCon">
+              <span v-if="showSubmitCon">{{ $t('common.close') }} {{ $t('con.submitCon') }}</span>
+              <span v-else>{{ $t('con.submitCon') }}</span>
+            </button>
+
+            <transition name="accordion">
+              <div class="submit-con-form" v-if="showSubmitCon">
+                <h4>{{ $t('con.submitCon') }}</h4>
+                <div class="form-group">
+                  <label>{{ $t('con.name') }} *</label>
+                  <input v-model="newCon.name" type="text" required />
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.avatar') }}</label>
+                  <div class="upload-row">
+                    <div class="con-avatar-preview" :style="{ background: newCon.theme_color }">
+                      <img v-if="newConAvatarPreview" :src="newConAvatarPreview" alt="" />
+                      <span v-else>{{ newCon.name?.[0] || '?' }}</span>
+                    </div>
+                    <label class="upload-chip inline">
+                      <input type="file" accept="image/*" @change="selectNewConAvatar" />
+                      {{ uploadingConAvatar ? $t('common.loading') : $t('con.uploadAvatar') }}
+                    </label>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.startDate') }} *</label>
+                    <input v-model="newCon.start_date" type="date" required />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('con.endDate') }} *</label>
+                    <input v-model="newCon.end_date" type="date" required />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.localName') }}</label>
+                  <input v-model="newCon.name_local" type="text" />
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.seriesKey') }}</label>
+                    <input v-model="newCon.series_key" type="text" />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('con.edition') }}</label>
+                    <input v-model="newCon.edition_label" type="text" />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.venue') }}</label>
+                  <input v-model="newCon.venue" type="text" />
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('hotel.address') }}</label>
+                  <input v-model="newCon.address" type="text" />
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.city') }}</label>
+                  <input v-model="newCon.city" type="text" />
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.latitude') }}</label>
+                    <input v-model="newCon.latitude" type="number" step="0.0000001" />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('con.longitude') }}</label>
+                    <input v-model="newCon.longitude" type="number" step="0.0000001" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>{{ $t('con.theme') }}</label>
+                    <input v-model="newCon.theme" type="text" />
+                  </div>
+                  <div class="form-group">
+                    <label>{{ $t('user.themeColor') }}</label>
+                    <input v-model="newCon.theme_color" type="color" class="color-input" />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>{{ $t('con.website') }}</label>
+                  <input v-model="newCon.website" type="url" />
+                </div>
+                <button class="btn btn-primary btn-full" type="button" @click="submitNewCon">
+                  {{ $t('common.confirm') }}
+                </button>
+              </div>
+            </transition>
+          </div>
+        </transition>
         
         <div class="my-cons">
           <article v-for="uc in userCons" :key="uc.id" class="my-con-item">
@@ -206,172 +381,6 @@
           </article>
         </div>
       </section>
-      
-      <!-- Add Con Modal -->
-      <div class="add-con-modal" v-if="showAddCon">
-        <div class="modal-header">
-          <h4>{{ $t('con.addCon') }}</h4>
-          <button @click="showAddCon = false">×</button>
-        </div>
-        
-        <div class="form-group">
-          <label>{{ $t('common.search') }}</label>
-          <input v-model="searchQuery" type="text" @input="searchCons" placeholder="Search cons..." />
-        </div>
-        
-        <div class="search-results">
-          <div 
-            v-for="con in searchResults" 
-            :key="con.id" 
-            class="search-item"
-            @click="selectConForAttendance(con)"
-          >
-            <span>{{ con.name }}</span>
-            <span class="search-item-date">{{ con.start_date }}</span>
-          </div>
-        </div>
-
-        <div class="attendance-form" v-if="selectedCon">
-          <div class="selected-con">
-            <strong>{{ selectedCon.name }}</strong>
-            <button @click="selectedCon = null">×</button>
-          </div>
-
-          <div class="form-group">
-            <label>{{ $t('con.comment') }}</label>
-            <textarea v-model="attendanceForm.comment" rows="2"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label>{{ $t('con.rating') }}</label>
-            <select v-model="attendanceForm.rating">
-              <option :value="null">-</option>
-              <option v-for="score in [5, 4, 3, 2, 1]" :key="score" :value="score">{{ score }}</option>
-            </select>
-          </div>
-
-          <div class="hotel-editor">
-            <div class="hotel-editor-head">
-              <label>{{ $t('con.hotel') }}</label>
-              <button class="link-btn" @click="addHotelRow">+ {{ $t('con.addHotel') }}</button>
-            </div>
-            <div v-for="(hotel, index) in attendanceForm.hotels" :key="index" class="hotel-row">
-              <label class="hotel-row-field">
-                <span>{{ $t('hotel.name') }}</span>
-                <input v-model="hotel.name" :placeholder="$t('hotel.name')" />
-              </label>
-              <label class="hotel-row-field">
-                <span>
-                  {{ $t('hotel.address') }}
-                  <span class="field-optional">({{ $t('common.optional') }})</span>
-                </span>
-                <input v-model="hotel.address" :placeholder="$t('hotel.addressOptionalPlaceholder')" />
-              </label>
-              <div class="hotel-date-row">
-                <input v-model="hotel.check_in" type="date" />
-                <input v-model="hotel.check_out" type="date" />
-                <button class="remove-hotel" type="button" @click="removeHotelRow(index)" :aria-label="$t('common.delete')">
-                  ×
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <button class="btn btn-primary btn-full" @click="saveAttendance">
-            {{ $t('common.save') }}
-          </button>
-        </div>
-        
-        <div class="divider"></div>
-        <button class="btn btn-outline btn-full" @click="showSubmitCon = true">
-          {{ $t('con.submitCon') }}
-        </button>
-      </div>
-      
-      <!-- Submit New Con Form -->
-      <div class="submit-con-form" v-if="showSubmitCon">
-        <h4>{{ $t('con.submitCon') }}</h4>
-        <div class="form-group">
-          <label>{{ $t('con.name') }} *</label>
-          <input v-model="newCon.name" type="text" required />
-        </div>
-        <div class="form-group">
-          <label>{{ $t('con.avatar') }}</label>
-          <div class="upload-row">
-            <div class="con-avatar-preview" :style="{ background: newCon.theme_color }">
-              <img v-if="newConAvatarPreview" :src="newConAvatarPreview" alt="" />
-              <span v-else>{{ newCon.name?.[0] || '?' }}</span>
-            </div>
-            <label class="upload-chip inline">
-              <input type="file" accept="image/*" @change="selectNewConAvatar" />
-              {{ uploadingConAvatar ? $t('common.loading') : $t('con.uploadAvatar') }}
-            </label>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>{{ $t('con.startDate') }} *</label>
-            <input v-model="newCon.start_date" type="date" required />
-          </div>
-          <div class="form-group">
-            <label>{{ $t('con.endDate') }} *</label>
-            <input v-model="newCon.end_date" type="date" required />
-          </div>
-        </div>
-        <div class="form-group">
-          <label>{{ $t('con.localName') }}</label>
-          <input v-model="newCon.name_local" type="text" />
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>{{ $t('con.seriesKey') }}</label>
-            <input v-model="newCon.series_key" type="text" />
-          </div>
-          <div class="form-group">
-            <label>{{ $t('con.edition') }}</label>
-            <input v-model="newCon.edition_label" type="text" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label>{{ $t('con.venue') }}</label>
-          <input v-model="newCon.venue" type="text" />
-        </div>
-        <div class="form-group">
-          <label>{{ $t('hotel.address') }}</label>
-          <input v-model="newCon.address" type="text" />
-        </div>
-        <div class="form-group">
-          <label>{{ $t('con.city') }}</label>
-          <input v-model="newCon.city" type="text" />
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>{{ $t('con.latitude') }}</label>
-            <input v-model="newCon.latitude" type="number" step="0.0000001" />
-          </div>
-          <div class="form-group">
-            <label>{{ $t('con.longitude') }}</label>
-            <input v-model="newCon.longitude" type="number" step="0.0000001" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>{{ $t('con.theme') }}</label>
-            <input v-model="newCon.theme" type="text" />
-          </div>
-          <div class="form-group">
-            <label>{{ $t('user.themeColor') }}</label>
-            <input v-model="newCon.theme_color" type="color" class="color-input" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label>{{ $t('con.website') }}</label>
-          <input v-model="newCon.website" type="url" />
-        </div>
-        <button class="btn btn-primary btn-full" @click="submitNewCon">
-          {{ $t('common.confirm') }}
-        </button>
-      </div>
 
       <section class="panel-section security-section">
         <button
@@ -618,6 +627,20 @@ async function fetchUserCons() {
   } catch (error) {
     console.warn('Failed to fetch user cons')
   }
+}
+
+function toggleAddCon() {
+  if (showAddCon.value) {
+    closeAddCon()
+    return
+  }
+  showAddCon.value = true
+}
+
+function closeAddCon() {
+  showAddCon.value = false
+  showSubmitCon.value = false
+  selectedCon.value = null
 }
 
 function visitStartTime(visit) {
@@ -1420,7 +1443,7 @@ watch(() => form.show_on_homepage, value => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 12px;
+  margin: 12px 0;
 }
 
 .history-hint {
