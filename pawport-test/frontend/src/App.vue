@@ -27,8 +27,9 @@
         </div>
       </div>
       
-      <nav class="header-nav" v-if="extensions.enableActiveUsers || extensions.enableFurryMeets">
+      <nav class="header-nav" v-if="showHeaderNav">
         <!-- 预留菜单扩展 -->
+        <router-link to="/admin" class="nav-item" v-if="authStore.user?.role === 'admin'">{{ $t('nav.admin') }}</router-link>
         <router-link to="/explore" class="nav-item" v-if="extensions.enableActiveUsers">{{ $t('nav.explore') }}</router-link>
         <router-link to="/stats" class="nav-item" v-if="extensions.enableFurryMeets">{{ $t('nav.stats') }}</router-link>
       </nav>
@@ -156,6 +157,11 @@ const appStyle = computed(() => ({
 }))
 
 const isHomeRoute = computed(() => route.name === 'Home')
+const showHeaderNav = computed(() => (
+  authStore.user?.role === 'admin'
+  || extensions.value.enableActiveUsers
+  || extensions.value.enableFurryMeets
+))
 const pageKey = computed(() => `${route.fullPath}:${visibilityStore.showTestData ? 'tests-on' : 'tests-off'}`)
 
 function toggleLocale() {

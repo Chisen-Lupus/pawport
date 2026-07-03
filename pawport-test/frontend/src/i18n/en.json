@@ -12,6 +12,7 @@
     "register": "Register",
     "logout": "Logout",
     "profile": "Profile",
+    "admin": "Admin",
     "settings": "Settings",
     "testDataOn": "Test Data: On",
     "testDataOff": "Test Data: Off"
@@ -124,6 +125,35 @@
     "saved": "Saved",
     "exportProfile": "Export Current Profile",
     "optional": "Optional"
+  },
+  "admin": {
+    "kicker": "Admin",
+    "title": "Admin Console",
+    "subtitle": "Review submitted conventions and correct coordinates, series metadata, and core details.",
+    "refresh": "Refresh",
+    "loginRequired": "Please sign in with an admin account.",
+    "forbidden": "This account does not have admin access.",
+    "statusFilter": "Review Status",
+    "searchPlaceholder": "Search name, year, city, or venue",
+    "empty": "No conventions match these filters.",
+    "submittedBy": "Submitted by",
+    "seriesName": "Series Name",
+    "approve": "Approve",
+    "reject": "Reject",
+    "loadFailed": "Failed to load the review list",
+    "saveFailed": "Save failed",
+    "approvedMessage": "Approved: {name}",
+    "rejectedMessage": "Rejected: {name}",
+    "savedMessage": "Saved: {name}",
+    "missingCoordinates": "Coordinates are missing; conventions without coordinates will not appear on the map.",
+    "invalidCoordinates": "Coordinate format looks invalid; latitude should be -90 to 90 and longitude should be -180 to 180.",
+    "possibleSwappedCoordinates": "Latitude and longitude may be swapped; latitude is usually between -90 and 90.",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "all": "All"
+    }
   },
   "auth": {
     "login": "Login",

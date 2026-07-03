@@ -36,6 +36,11 @@ const router = createRouter({
       name: 'ConDetail',
       component: () => import('./views/ConDetailView.vue'),
     },
+    {
+      path: '/admin',
+      name: 'Admin',
+      component: () => import('./views/AdminView.vue'),
+    },
     // 预留扩展页面
     {
       path: '/explore',

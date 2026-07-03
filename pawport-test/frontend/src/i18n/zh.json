@@ -12,6 +12,7 @@
     "register": "注册",
     "logout": "退出",
     "profile": "个人资料",
+    "admin": "管理员",
     "settings": "设置",
     "testDataOn": "测试数据：开",
     "testDataOff": "测试数据：关"
@@ -124,6 +125,35 @@
     "saved": "已保存",
     "exportProfile": "导出当前用户资料",
     "optional": "可选"
+  },
+  "admin": {
+    "kicker": "Admin",
+    "title": "管理员后台",
+    "subtitle": "审核用户提交的兽展，修正坐标、系列信息和基础资料。",
+    "refresh": "刷新",
+    "loginRequired": "请先登录管理员账号。",
+    "forbidden": "当前账号没有管理员权限。",
+    "statusFilter": "审核状态",
+    "searchPlaceholder": "搜索名称、年份、城市、会场",
+    "empty": "没有符合条件的展会。",
+    "submittedBy": "提交者",
+    "seriesName": "系列名称",
+    "approve": "通过",
+    "reject": "拒绝",
+    "loadFailed": "审核列表加载失败",
+    "saveFailed": "保存失败",
+    "approvedMessage": "已通过：{name}",
+    "rejectedMessage": "已拒绝：{name}",
+    "savedMessage": "已保存：{name}",
+    "missingCoordinates": "缺少经纬度；没有坐标的展会不会显示在地图上。",
+    "invalidCoordinates": "经纬度格式异常；纬度应在 -90 到 90，经度应在 -180 到 180。",
+    "possibleSwappedCoordinates": "经纬度可能填反了；纬度通常应在 -90 到 90。",
+    "status": {
+      "pending": "待审核",
+      "approved": "已通过",
+      "rejected": "已拒绝",
+      "all": "全部"
+    }
   },
   "auth": {
     "login": "登录",

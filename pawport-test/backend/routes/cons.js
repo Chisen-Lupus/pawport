@@ -265,6 +265,62 @@ router.get('/:id/hotel-stats', async (req, res) => {
   }
 });
 
+// GET /api/cons/admin/review - List cons awaiting or needing admin review
+router.get('/admin/review', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { status = 'pending', search } = req.query;
+    const where = {};
+
+    if (['pending', 'approved', 'rejected'].includes(status)) {
+      where.status = status;
+    }
+
+    if (!shouldIncludeTestData(req, appConfig.features.showTestCons)) {
+      where.is_test = false;
+    }
+
+    if (search) {
+      where[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { name_en: { [Op.like]: `%${search}%` } },
+        { name_local: { [Op.like]: `%${search}%` } },
+        { series_name: { [Op.like]: `%${search}%` } },
+        { edition_label: { [Op.like]: `%${search}%` } },
+        { start_date: { [Op.like]: `%${search}%` } },
+        { end_date: { [Op.like]: `%${search}%` } },
+        { venue: { [Op.like]: `%${search}%` } },
+        { city: { [Op.like]: `%${search}%` } },
+        { address: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    const cons = await Con.findAll({
+      where,
+      order: [['created_at', 'DESC']],
+      limit: 200,
+    });
+
+    const submitterIds = [...new Set(cons.map(con => con.submitted_by).filter(Boolean))];
+    const submitters = submitterIds.length
+      ? await User.findAll({
+        where: { id: { [Op.in]: submitterIds } },
+        attributes: ['id', 'username', 'display_name', 'avatar_url', 'theme_color', 'role'],
+      })
+      : [];
+    const submitterById = new Map(submitters.map(user => [user.id, user.toJSON()]));
+
+    res.json({
+      cons: cons.map(con => ({
+        ...con.toJSON(),
+        submitted_by_user: submitterById.get(con.submitted_by) || null,
+      })),
+    });
+  } catch (error) {
+    console.error('Admin review cons error:', error);
+    res.status(500).json({ error: 'Failed to fetch review cons' });
+  }
+});
+
 // GET /api/cons/:id - Get single con with attendees
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
