@@ -160,6 +160,7 @@
             <transition name="accordion">
               <div class="submit-con-form" v-if="showSubmitCon">
                 <h4>{{ $t('con.submitCon') }}</h4>
+                <p class="submit-con-hint">{{ $t('con.submitConVisibilityHint') }}</p>
                 <div class="form-group">
                   <label>{{ $t('con.name') }} *</label>
                   <input v-model="newCon.name" type="text" required />
@@ -1353,6 +1354,16 @@ watch(() => form.show_on_homepage, value => {
   gap: 12px;
   
   .form-group { flex: 1; }
+}
+
+.submit-con-hint {
+  margin: -2px 0 12px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--user-primary, var(--primary)) 10%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.82em;
+  line-height: 1.45;
 }
 
 .settings-list {

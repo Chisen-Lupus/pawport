@@ -74,6 +74,7 @@
     "hotel": "住宿酒店",
     "addHotel": "添加酒店",
     "submitCon": "提交新展",
+    "submitConVisibilityHint": "提示：只有填写了经纬度，并且经过管理员批准的兽展，才会显示在地图轨迹图上。",
     "website": "信息来源",
     "theme": "主题",
     "avatar": "展会头像",

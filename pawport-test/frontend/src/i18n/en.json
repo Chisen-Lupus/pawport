@@ -74,6 +74,7 @@
     "hotel": "Hotel",
     "addHotel": "Add Hotel",
     "submitCon": "Submit New Con",
+    "submitConVisibilityHint": "Note: only conventions with latitude/longitude and admin approval will appear on map trajectories.",
     "website": "Info Source",
     "theme": "Theme",
     "avatar": "Con Avatar",
