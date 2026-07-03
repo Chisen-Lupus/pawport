@@ -760,6 +760,42 @@ function showAllDates() {
   mapFilters.to = ''
 }
 
+function applyRecentConsView() {
+  showTrajectories.value = true
+  hideNoTrajectoryNodes.value = false
+  showOnlyMine.value = false
+  Object.assign(mapFilters, defaultFilters())
+  renderMarkers()
+  renderTrajectories()
+}
+
+async function applyAllTrajectoriesView() {
+  showTrajectories.value = true
+  hideNoTrajectoryNodes.value = true
+  showOnlyMine.value = false
+  mapFilters.region = 'all'
+  mapFilters.from = ''
+  mapFilters.to = ''
+
+  try {
+    await loadTrajectoryUsers()
+  } catch (error) {
+    console.warn('Failed to load trajectory users:', error)
+  }
+
+  renderMarkers()
+  renderTrajectories()
+}
+
+function handleMapViewPreset(event) {
+  const preset = event.detail?.preset
+  if (preset === 'recent') {
+    applyRecentConsView()
+  } else if (preset === 'allTrajectories') {
+    applyAllTrajectoriesView()
+  }
+}
+
 function shouldShowVenueLine(con) {
   if (!con?.venue) return false
   const venue = normalizeDisplayText(con.venue)
@@ -1701,6 +1737,7 @@ onMounted(async () => {
   initMap()
   window.addEventListener('pawport-profile-updated', handleProfileUpdated)
   window.addEventListener('pawport-attendance-updated', handleAttendanceUpdated)
+  window.addEventListener('pawport-map-view-preset', handleMapViewPreset)
   await nextTick()
   await refreshMapData()
 })
@@ -1711,6 +1748,7 @@ onUnmounted(() => {
   clearTimeout(currentUserTrajectoryTimer)
   window.removeEventListener('pawport-profile-updated', handleProfileUpdated)
   window.removeEventListener('pawport-attendance-updated', handleAttendanceUpdated)
+  window.removeEventListener('pawport-map-view-preset', handleMapViewPreset)
   if (map) {
     map.remove()
     map = null

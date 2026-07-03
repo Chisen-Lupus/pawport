@@ -17,6 +17,14 @@
           <span class="test-data-dot"></span>
           <span>{{ visibilityStore.showTestData ? $t('nav.testDataOn') : $t('nav.testDataOff') }}</span>
         </button>
+        <div class="view-preset-controls" v-if="isHomeRoute">
+          <button class="view-preset-btn" type="button" @click="setMapViewPreset('recent')">
+            {{ $t('map.recentConsView') }}
+          </button>
+          <button class="view-preset-btn" type="button" @click="setMapViewPreset('allTrajectories')">
+            {{ $t('map.allTrajectoriesView') }}
+          </button>
+        </div>
       </div>
       
       <nav class="header-nav" v-if="extensions.enableActiveUsers || extensions.enableFurryMeets">
@@ -147,12 +155,17 @@ const appStyle = computed(() => ({
   '--user-primary': authStore.isLoggedIn ? authStore.themeColor : 'var(--primary)',
 }))
 
+const isHomeRoute = computed(() => route.name === 'Home')
 const pageKey = computed(() => `${route.fullPath}:${visibilityStore.showTestData ? 'tests-on' : 'tests-off'}`)
 
 function toggleLocale() {
   const newLocale = themeStore.locale === 'zh' ? 'en' : 'zh'
   themeStore.setLocale(newLocale)
   locale.value = newLocale
+}
+
+function setMapViewPreset(preset) {
+  window.dispatchEvent(new CustomEvent('pawport-map-view-preset', { detail: { preset } }))
 }
 
 function welcomeDismissed() {
@@ -268,6 +281,33 @@ onMounted(async () => {
   background: currentColor;
   opacity: 0.9;
   flex: 0 0 auto;
+}
+
+.view-preset-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.view-preset-btn {
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.84em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), background var(--transition), transform var(--transition);
+
+  &:hover {
+    transform: translateY(-1px);
+    color: var(--user-primary, var(--primary));
+    border-color: var(--user-primary, var(--primary));
+  }
 }
 
 .header-nav {
@@ -562,6 +602,10 @@ onMounted(async () => {
   }
   
   .header-nav {
+    display: none;
+  }
+
+  .view-preset-controls {
     display: none;
   }
   

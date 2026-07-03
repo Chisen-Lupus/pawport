@@ -668,7 +668,7 @@ async function searchCons() {
   }
   try {
     const res = await api.get('/cons', { params: { search: searchQuery.value } })
-    searchResults.value = (res.data.cons || []).slice(0, 10)
+    searchResults.value = (res.data.cons || []).slice(0, 80)
   } catch (error) {
     searchResults.value = []
   }
