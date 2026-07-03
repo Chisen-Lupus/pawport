@@ -16,6 +16,19 @@
     "testDataOn": "Test Data: On",
     "testDataOff": "Test Data: Off"
   },
+  "welcome": {
+    "title": "Welcome to PawPort",
+    "intro": "PawPort is a map for tracking your furry convention journey and seeing where friends are attending and staying.",
+    "profile": "You can mark conventions you have attended or plan to attend, add comments, ratings, and hotels. If you make your attendance record public, the map can also show your avatar, history, and travel trajectory.",
+    "testing": "The site is currently in testing. Turn on the Test Data button in the upper left to explore more map trajectories, active conventions, hotel statistics, and other features.",
+    "sources": "Convention data currently comes mainly from furrycons.cn and furrycons.com, and users can also submit convention information directly. Thanks to these public data sources, and corrections or additions are welcome.",
+    "eastAsia": "For East Asian conventions outside Greater China, such as Japan and Korea, we are still looking for a suitable API or database. For now you can add them manually; once a matching database is available, we will try to support manually merging existing records.",
+    "feedback": "To suggest changes, report issues, or join testing, add QQ group 1046778783 or open a GitHub issue:",
+    "primaryAction": "Start Exploring",
+    "laterAction": "Maybe Later",
+    "dontShowAgain": "Do not show again",
+    "closeLabel": "Close welcome guide"
+  },
   "map": {
     "activeCon": "Active Now",
     "upcomingCon": "Upcoming",
