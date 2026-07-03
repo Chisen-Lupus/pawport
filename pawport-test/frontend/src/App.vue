@@ -19,9 +19,8 @@
         </button>
       </div>
       
-      <nav class="header-nav">
+      <nav class="header-nav" v-if="extensions.enableActiveUsers || extensions.enableFurryMeets">
         <!-- 预留菜单扩展 -->
-        <router-link to="/" class="nav-item">{{ $t('nav.home') }}</router-link>
         <router-link to="/explore" class="nav-item" v-if="extensions.enableActiveUsers">{{ $t('nav.explore') }}</router-link>
         <router-link to="/stats" class="nav-item" v-if="extensions.enableFurryMeets">{{ $t('nav.stats') }}</router-link>
       </nav>
