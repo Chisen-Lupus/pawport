@@ -2,6 +2,13 @@
 
 A furry convention tracking website that lets users mark conventions they've attended and see where others have been.
 
+## Docs
+
+- [Site Overview](docs/site-overview.md): full feature list, pages, data sources, data model, and architecture.
+- [Local Quick Start](docs/local-quick-start.md): macOS local development startup steps.
+- [Server Ops Runbook](docs/server-ops.md): first migration, post-reboot checks, post-`git pull` steps, and troubleshooting.
+- [Source Note](docs/source-note.md): initial project source note.
+
 ## Quick Start (macOS Local Development)
 
 ### Prerequisites

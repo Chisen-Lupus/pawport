@@ -2,6 +2,13 @@
 
 这是一个面向兽展与旅行足迹的站点原型，当前已在 macOS 本地完成基础部署流程。
 
+## 文档索引
+
+- [网站详细说明](pawport-test/docs/site-overview.md)：完整功能、页面、数据来源、数据模型和架构说明。
+- [本地快速启动](pawport-test/docs/local-quick-start.md)：macOS 本地开发启动步骤。
+- [服务器运维 Runbook](pawport-test/docs/server-ops.md)：首次迁移、服务器重启后检查、每次 `git pull` 后操作、常见问题排查。
+- [来源说明](pawport-test/docs/source-note.md)：项目初始来源记录。
+
 ## 本地运行
 
 1. 初始化本地 SQLite 测试库：
