@@ -10,7 +10,8 @@
     "db:seed": "node database/seed.js",
     "db:reset": "node database/init.js --force && node database/seed.js",
     "sync:fcc": "node services/fccSync.js --once",
-    "sync:furrycons-com": "node services/furryConsComSync.js --once"
+    "sync:furrycons-com": "node services/furryConsComSync.js --once",
+    "backfill:furrycons-com-details": "node services/furryConsComSync.js --detail-backfill"
   },
   "dependencies": {
     "axios": "^1.6.2",

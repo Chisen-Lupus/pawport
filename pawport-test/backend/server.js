@@ -11,7 +11,7 @@ const appConfig = require('../config/app.config');
 const secretsConfig = require('../config/secrets.config');
 const { sequelize } = require('./database/init');
 const { syncFCC } = require('./services/fccSync');
-const { syncFurryConsCom } = require('./services/furryConsComSync');
+const { backfillFurryConsComDetails, syncFurryConsCom } = require('./services/furryConsComSync');
 
 const app = express();
 
@@ -102,6 +102,13 @@ async function start() {
         syncFurryConsCom();
       });
       console.log(`✅ FurryCons.com sync scheduled (${cronRule})`);
+
+      const backfillCronRule = appConfig.furryConsCom?.detailBackfillCron || '30 4 * * *';
+      cron.schedule(backfillCronRule, () => {
+        console.log('🔄 Running scheduled FurryCons.com detail backfill...');
+        backfillFurryConsComDetails();
+      });
+      console.log(`✅ FurryCons.com detail backfill scheduled (${backfillCronRule})`);
 
       setTimeout(() => {
         console.log('🔄 Running initial FurryCons.com sync...');

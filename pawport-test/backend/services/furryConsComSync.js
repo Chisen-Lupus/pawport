@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { Op } = require('sequelize');
 
 require('../utils/loadEnv')();
 
@@ -261,6 +262,10 @@ function normalizeFurryConsUrl(url) {
   } catch (error) {
     return null;
   }
+}
+
+function sourceUrlForCon(con) {
+  return normalizeFurryConsUrl(con?.extra_fields?.sourceUrl || con?.website);
 }
 
 function extractJsonLdScripts(html) {
@@ -601,6 +606,103 @@ async function fetchEventDetail(event) {
   return parseDetailEventFromHtml(response.data, sourceUrl);
 }
 
+function eventFromCon(con) {
+  const sourceUrl = sourceUrlForCon(con);
+  return {
+    '@type': 'Event',
+    name: con.name,
+    startDate: con.start_date,
+    endDate: con.end_date || con.start_date,
+    url: sourceUrl,
+    image: con.poster_url || con.avatar_url,
+    description: con.description,
+    location: {
+      '@type': 'Place',
+      name: con.venue,
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: con.city,
+        addressCountry: con.country,
+      },
+    },
+  };
+}
+
+function shouldBackfillConDetail(con, requestedFccIds = null) {
+  if (!sourceUrlForCon(con)) return false;
+  if (requestedFccIds && !requestedFccIds.has(con.fcc_id)) return false;
+  return precisionRank(con.extra_fields?.locationPrecision) < precisionRank('geo');
+}
+
+async function findDetailBackfillCons(options = {}) {
+  const requestedFccIds = options.fccIds?.length
+    ? new Set(options.fccIds.map(id => id.startsWith(SOURCE_PREFIX) ? id : `${SOURCE_PREFIX}${id}`))
+    : null;
+
+  const cons = await Con.findAll({
+    where: { fcc_id: { [Op.like]: `${SOURCE_PREFIX}%` } },
+    attributes: [
+      'id', 'name', 'start_date', 'end_date', 'venue', 'city', 'country',
+      'poster_url', 'avatar_url', 'website', 'description', 'fcc_id', 'extra_fields',
+    ],
+    order: [['start_date', 'DESC']],
+  });
+
+  return cons
+    .filter(con => shouldBackfillConDetail(con, requestedFccIds))
+    .slice(0, Number(options.limit || appConfig.furryConsCom?.detailBackfillLimit || 50));
+}
+
+async function backfillFurryConsComDetails(options = {}) {
+  if (!appConfig.features.enableFurryConsComSync) {
+    console.log('⏭️ FurryCons.com detail backfill is disabled');
+    return { skipped: true, reason: 'feature-disabled' };
+  }
+
+  const delayMs = Number(options.delayMs ?? appConfig.furryConsCom?.detailRequestDelayMs ?? 0);
+  const cons = await findDetailBackfillCons(options);
+  const stats = {
+    checked: cons.length,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
+    rateLimited: false,
+  };
+
+  console.log(`🔄 Starting FurryCons.com detail backfill (${cons.length} records)...`);
+
+  for (const con of cons) {
+    const listEvent = eventFromCon(con);
+    try {
+      const detail = await fetchEventDetail(listEvent);
+      const merged = mergeEventDetails(listEvent, detail);
+      const conData = mapEventToConData(merged);
+
+      if (!conData.fcc_id || !conData.latitude || !conData.longitude || conData.extra_fields.locationPrecision !== 'geo') {
+        stats.skipped++;
+      } else {
+        await upsertCon(conData);
+        stats.updated++;
+      }
+    } catch (error) {
+      stats.failed++;
+      console.error(`  ⚠️ FurryCons.com detail backfill failed for ${con.website || con.name}:`, error.message);
+      if (error.response?.status === 429 && appConfig.furryConsCom?.stopDetailsOnRateLimit !== false) {
+        stats.rateLimited = true;
+        console.error('  ⚠️ FurryCons.com rate limit reached; stopping detail backfill');
+        break;
+      }
+    }
+
+    if (delayMs && con !== cons[cons.length - 1]) {
+      await sleep(delayMs);
+    }
+  }
+
+  console.log(`  ✅ FurryCons.com detail backfill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed`);
+  return stats;
+}
+
 function numericCoordinate(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -826,22 +928,39 @@ async function syncFurryConsCom(options = {}) {
 }
 
 function cliOptions(argv) {
+  const limit = argv.find(arg => arg.startsWith('--limit='))?.split('=')[1];
+  const ids = argv.find(arg => arg.startsWith('--ids='))?.split('=')[1];
+  const common = {
+    ...(limit ? { limit: Number(limit) } : {}),
+    ...(ids ? { fccIds: ids.split(',').map(id => id.trim()).filter(Boolean) } : {}),
+  };
+
+  if (argv.includes('--detail-backfill')) {
+    return { mode: 'detail-backfill', ...common };
+  }
+
   const year = argv.find(arg => arg.startsWith('--year='))?.split('=')[1];
-  if (year) return { fromYear: Number(year), toYear: Number(year) };
+  if (year) return { fromYear: Number(year), toYear: Number(year), ...common };
 
   const fromYear = argv.find(arg => arg.startsWith('--from='))?.split('=')[1];
   const toYear = argv.find(arg => arg.startsWith('--to='))?.split('=')[1];
   return {
     ...(fromYear ? { fromYear: Number(fromYear) } : {}),
     ...(toYear ? { toYear: Number(toYear) } : {}),
+    ...common,
   };
 }
 
 if (require.main === module) {
-  syncFurryConsCom(cliOptions(process.argv.slice(2))).then(() => process.exit(0)).catch(() => process.exit(1));
+  const options = cliOptions(process.argv.slice(2));
+  const task = options.mode === 'detail-backfill'
+    ? backfillFurryConsComDetails(options)
+    : syncFurryConsCom(options);
+  task.then(() => process.exit(0)).catch(() => process.exit(1));
 }
 
 module.exports = {
+  backfillFurryConsComDetails,
   syncFurryConsCom,
   parseEventsFromHtml,
   mapEventToConData,

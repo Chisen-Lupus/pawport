@@ -59,6 +59,8 @@ module.exports = {
     requestDelayMs: 250,
     fetchDetails: true,
     detailRequestDelayMs: 1500,
+    detailBackfillLimit: 50,
+    detailBackfillCron: '30 4 * * *',
     stopDetailsOnRateLimit: true,
     syncCron: '0 4 1 * *',
   },
