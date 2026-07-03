@@ -300,20 +300,41 @@ const mapLabels = [
   { type: 'city', lat: 52.52, lng: 13.405, zh: '柏林', en: 'Berlin' },
 ]
 
-const candidateCons = computed(() => {
+const scopedCons = computed(() => {
   const base = consStore.mapCons.filter(conMatchesFilters)
-  const scoped = showOnlyMine.value && authStore.isLoggedIn
+  return showOnlyMine.value && authStore.isLoggedIn
     ? base.filter(con => myConIds.value.has(con.id))
     : base
-  return mergeConSeries.value ? mergeSeriesCons(scoped) : scoped
+})
+
+const candidateCons = computed(() => {
+  return mergeConSeries.value ? mergeSeriesCons(scopedCons.value) : scopedCons.value
+})
+
+const trajectoryDisplayContext = computed(() => {
+  const sourceCons = scopedCons.value
+  const visibleCons = candidateCons.value
+  const sourceIds = new Set(sourceCons.map(con => con.id))
+  const visibleIds = new Set(visibleCons.map(con => con.id))
+  const sourceConById = new Map(sourceCons.map(con => [con.id, con]))
+  const representativeBySeries = new Map()
+
+  if (mergeConSeries.value) {
+    visibleCons.forEach(con => {
+      const key = conSeriesKey(con)
+      if (key) representativeBySeries.set(key, con)
+    })
+  }
+
+  return { sourceIds, visibleIds, sourceConById, representativeBySeries }
 })
 
 const trajectoryNodeIds = computed(() => {
-  const candidateIds = new Set(candidateCons.value.map(con => con.id))
+  const context = trajectoryDisplayContext.value
   const nodeIds = new Set()
 
   trajectoryUsers.value.forEach(user => {
-    const visits = getSortedTrajectoryVisits(user, candidateIds)
+    const visits = getSortedTrajectoryVisits(user, context)
     if (visits.length < 2) return
     visits.forEach(visit => nodeIds.add(visit.Con.id))
   })
@@ -1311,10 +1332,10 @@ async function loadTrajectoryUsers() {
 
 function collectSegmentCounts(users) {
   const segmentCounts = new Map()
-  const displayedConIds = new Set(filteredCons.value.map(con => con.id))
+  const context = trajectoryDisplayContext.value
 
   users.forEach(user => {
-    const visits = getSortedTrajectoryVisits(user, displayedConIds)
+    const visits = getSortedTrajectoryVisits(user, context)
     visits.slice(0, -1).forEach((visit, index) => {
       const next = visits[index + 1]
       const key = `${visit.Con.id}->${next.Con.id}`
@@ -1335,12 +1356,62 @@ function canShowTrajectory(user) {
   return user?.show_con_history !== false && user?.show_on_homepage !== false
 }
 
-function getSortedTrajectoryVisits(user, displayedConIds = new Set(filteredCons.value.map(con => con.id))) {
+function getSortedTrajectoryVisits(user, context = trajectoryDisplayContext.value) {
   if (!canShowTrajectory(user)) return []
 
-  return getTrajectoryVisits(user)
-    .filter(visit => visit.Con?.latitude && visit.Con?.longitude && displayedConIds.has(visit.Con.id))
+  const visits = getTrajectoryVisits(user)
+    .map(visit => normalizeTrajectoryVisit(visit, context))
+    .filter(Boolean)
     .sort(compareVisitsByConDate)
+
+  return visits.filter((visit, index) => {
+    if (index === 0) return true
+    return visit.Con.id !== visits[index - 1].Con.id
+  })
+}
+
+function normalizeTrajectoryVisit(visit, context) {
+  const rawCon = visit.Con
+  if (!rawCon || !context.sourceIds.has(rawCon.id)) return null
+
+  const sourceCon = context.sourceConById.get(rawCon.id) || rawCon
+  const actualCon = {
+    ...sourceCon,
+    ...rawCon,
+    series_key: rawCon.series_key || sourceCon.series_key,
+    series_name: rawCon.series_name || sourceCon.series_name,
+  }
+
+  if (!hasConCoordinates(actualCon)) return null
+
+  let displayCon = null
+  if (mergeConSeries.value) {
+    const key = conSeriesKey(actualCon)
+    displayCon = key ? context.representativeBySeries.get(key) : null
+  }
+  if (!displayCon && context.visibleIds.has(actualCon.id)) {
+    displayCon = sourceCon
+  }
+  if (!hasConCoordinates(displayCon)) return null
+
+  return {
+    ...visit,
+    Con: {
+      ...actualCon,
+      id: displayCon.id,
+      name: displayCon.name || actualCon.name,
+      latitude: displayCon.latitude,
+      longitude: displayCon.longitude,
+      city: displayCon.city || actualCon.city,
+      theme_color: displayCon.theme_color || actualCon.theme_color,
+      series_key: displayCon.series_key || actualCon.series_key,
+      series_name: displayCon.series_name || actualCon.series_name,
+    },
+  }
+}
+
+function hasConCoordinates(con) {
+  return Number.isFinite(Number(con?.latitude)) && Number.isFinite(Number(con?.longitude))
 }
 
 function getUserTrajectorySegments(user, segmentCounts) {

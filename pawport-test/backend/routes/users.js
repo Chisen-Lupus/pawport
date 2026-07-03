@@ -51,7 +51,7 @@ router.get('/', optionalAuth, async (req, res) => {
         model: UserCon,
         include: [{
           model: Con,
-          attributes: ['id', 'name', 'latitude', 'longitude', 'start_date', 'end_date', 'city'],
+          attributes: ['id', 'name', 'series_key', 'series_name', 'latitude', 'longitude', 'start_date', 'end_date', 'city'],
           where: visibleConWhere(req),
           required: false,
         }],
