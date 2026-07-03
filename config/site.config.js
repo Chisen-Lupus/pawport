@@ -43,10 +43,10 @@ module.exports = {
     detailPath: '/event',
     keepOld: true,
     fetchDetails: false,
-    syncPastMonths: 18,
+    syncPastMonths: 84,
     syncFutureMonths: 18,
     pageSize: 100,
-    maxPages: 20,
+    maxPages: 50,
     syncInterval: 24 * 60 * 60 * 1000,
   },
 };
