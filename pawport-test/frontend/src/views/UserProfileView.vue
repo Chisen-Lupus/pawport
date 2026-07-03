@@ -15,8 +15,18 @@
         <div v-for="uc in userProfile.cons" :key="uc.id" class="con-item">
           <div class="con-item-color" :style="{ background: uc.Con?.theme_color }"></div>
           <div class="con-item-info">
-            <h4>{{ uc.Con?.name }}</h4>
+            <div class="con-item-title">
+              <h4>{{ uc.Con?.name }}</h4>
+              <span
+                v-if="shouldShowConStatus(uc)"
+                class="con-status-badge"
+                :class="`status-${conStatus(uc)}`"
+              >
+                {{ conStatusLabel(uc) }}
+              </span>
+            </div>
             <p>{{ uc.Con?.city }} · {{ uc.Con?.start_date }}</p>
+            <p v-if="conStatusHint(uc)" class="con-status-hint">{{ conStatusHint(uc) }}</p>
             <p v-if="uc.comment" class="con-comment">"{{ uc.comment }}"</p>
           </div>
           <div class="con-item-rating" v-if="uc.rating">
@@ -31,10 +41,33 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '@/utils/api'
 
 const route = useRoute()
+const { t } = useI18n()
 const userProfile = ref(null)
+const REVIEW_STATUSES = new Set(['pending', 'approved', 'rejected'])
+
+function conStatus(visit) {
+  const status = visit.Con?.status
+  return REVIEW_STATUSES.has(status) ? status : 'approved'
+}
+
+function shouldShowConStatus(visit) {
+  return conStatus(visit) !== 'approved'
+}
+
+function conStatusLabel(visit) {
+  return t(`admin.status.${conStatus(visit)}`)
+}
+
+function conStatusHint(visit) {
+  const status = conStatus(visit)
+  if (status === 'pending') return t('user.pendingConHint')
+  if (status === 'rejected') return t('user.rejectedConHint')
+  return ''
+}
 
 onMounted(async () => {
   try {
@@ -117,6 +150,33 @@ onMounted(async () => {
     h4 { font-size: 1em; margin-bottom: 2px; }
     p { font-size: 0.85em; color: var(--text-secondary); }
     .con-comment { font-style: italic; margin-top: 4px; }
+    .con-status-hint { margin-top: 4px; }
+  }
+
+  .con-item-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .con-status-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-full);
+    padding: 2px 8px;
+    font-size: 0.7em;
+    font-weight: 800;
+
+    &.status-pending {
+      background: color-mix(in srgb, #F59E0B 16%, transparent);
+      color: #D97706;
+    }
+
+    &.status-rejected {
+      background: color-mix(in srgb, #DC2626 14%, transparent);
+      color: #DC2626;
+    }
   }
   
   .con-item-rating {

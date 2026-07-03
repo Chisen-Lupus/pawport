@@ -121,6 +121,8 @@
     "showOnHomepage": "公开参展记录",
     "showHistory": "在首页展示轨迹",
     "showHotel": "展示住宿信息",
+    "pendingConHint": "待审核：通过后才会出现在公开页面和首页轨迹中。",
+    "rejectedConHint": "已拒绝：不会出现在公开页面和首页轨迹中，可以删除记录或重新提交。",
     "save": "保存",
     "saved": "已保存",
     "exportProfile": "导出当前用户资料",

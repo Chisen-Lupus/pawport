@@ -25,11 +25,15 @@ function visibleUserWhere(req) {
   return where;
 }
 
-function visibleConWhere(req) {
-  if (shouldIncludeTestData(req, appConfig.features.showTestCons)) {
-    return {};
+function visibleConWhere(req, options = {}) {
+  const where = {};
+  if (!options.includeUnapproved) {
+    where.status = 'approved';
   }
-  return { is_test: false };
+  if (!shouldIncludeTestData(req, appConfig.features.showTestCons)) {
+    where.is_test = false;
+  }
+  return where;
 }
 
 function visibleHotelWhere(req) {
@@ -51,7 +55,7 @@ router.get('/', optionalAuth, async (req, res) => {
         model: UserCon,
         include: [{
           model: Con,
-          attributes: ['id', 'name', 'series_key', 'series_name', 'latitude', 'longitude', 'start_date', 'end_date', 'city'],
+          attributes: ['id', 'name', 'series_key', 'series_name', 'latitude', 'longitude', 'start_date', 'end_date', 'city', 'status'],
           where: visibleConWhere(req),
           required: false,
         }],
@@ -75,11 +79,14 @@ router.get('/', optionalAuth, async (req, res) => {
 // GET /api/users/:id - Get user profile with con history
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
+    const isOwner = req.userId === req.params.id;
+    const userWhere = { id: req.params.id };
+    if (!isOwner) {
+      Object.assign(userWhere, visibleUserWhere(req));
+    }
+
     const user = await User.findOne({
-      where: {
-        id: req.params.id,
-        ...visibleUserWhere(req),
-      },
+      where: userWhere,
       attributes: { exclude: ['password_hash', 'google_id', 'wechat_id', 'qq_id'] },
       include: [{
         model: UserCon,
@@ -89,8 +96,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
             attributes: [
               'id', 'name', 'name_en', 'start_date', 'end_date', 'venue', 'address',
               'city', 'country', 'latitude', 'longitude', 'avatar_url', 'theme_color',
+              'status',
             ],
-            where: visibleConWhere(req),
+            where: visibleConWhere(req, { includeUnapproved: isOwner }),
             required: false,
           },
           {
@@ -110,7 +118,6 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
 
     // Check privacy settings
-    const isOwner = req.userId === user.id;
     const response = {
       id: user.id,
       username: user.username,

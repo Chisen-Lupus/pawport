@@ -186,8 +186,19 @@
             <article v-for="visit in windowItem.data.cons" :key="visit.id" class="history-item">
               <span class="history-dot" :style="{ background: visit.Con?.theme_color || windowItem.color }"></span>
               <div>
-                <strong>{{ visit.Con?.name }}</strong>
+                <div class="history-title">
+                  <strong>{{ visit.Con?.name }}</strong>
+                  <span
+                    v-if="shouldShowConStatus(visit)"
+                    class="con-status-badge"
+                    :class="`status-${conStatus(visit)}`"
+                  >
+                    {{ $t(`admin.status.${conStatus(visit)}`) }}
+                  </span>
+                </div>
                 <p>{{ formatDate(visit.Con?.start_date) }} · {{ visit.Con?.city || '' }}</p>
+                <p v-if="conStatus(visit) === 'pending'" class="muted status-hint">{{ $t('user.pendingConHint') }}</p>
+                <p v-else-if="conStatus(visit) === 'rejected'" class="muted status-hint">{{ $t('user.rejectedConHint') }}</p>
                 <p v-if="visit.comment" class="muted">{{ visit.comment }}</p>
                 <p v-if="visit.Hotels?.length" class="hotel-line">
                   {{ $t('con.hotel') }}: {{ visit.Hotels.map(hotel => hotel.name).join(', ') }}
@@ -239,6 +250,7 @@ let currentUserTrajectoryTimer = null
 const trajectoryUsers = ref([])
 const trajectoryLayersByUser = new Map()
 const TRAJECTORY_PANE = 'trajectoryPane'
+const REVIEW_STATUSES = new Set(['pending', 'approved', 'rejected'])
 
 function toDateInput(date) {
   const year = date.getFullYear()
@@ -378,6 +390,15 @@ function displayName(user) {
 function formatDate(date) {
   if (!date) return ''
   return new Date(date).toLocaleDateString(themeStore.locale === 'zh' ? 'zh-CN' : 'en-US')
+}
+
+function conStatus(visit) {
+  const status = visit.Con?.status
+  return REVIEW_STATUSES.has(status) ? status : 'approved'
+}
+
+function shouldShowConStatus(visit) {
+  return conStatus(visit) !== 'approved'
 }
 
 function limitedAttendees(attendees = []) {
@@ -2377,11 +2398,41 @@ watch(
   background: var(--bg-secondary);
 }
 
+.history-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.con-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+  font-size: 0.68em;
+  font-weight: 800;
+
+  &.status-pending {
+    background: color-mix(in srgb, #F59E0B 16%, transparent);
+    color: #D97706;
+  }
+
+  &.status-rejected {
+    background: color-mix(in srgb, #DC2626 14%, transparent);
+    color: #DC2626;
+  }
+}
+
 .history-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   margin-top: 5px;
+}
+
+.status-hint {
+  margin-top: 3px;
 }
 
 .hotel-line {

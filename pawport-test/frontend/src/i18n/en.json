@@ -121,6 +121,8 @@
     "showOnHomepage": "Public Attendance Record",
     "showHistory": "Show Trajectory on Homepage",
     "showHotel": "Show Hotel Info",
+    "pendingConHint": "Pending: it will appear on public pages and homepage trajectories after approval.",
+    "rejectedConHint": "Rejected: it will not appear on public pages or homepage trajectories. You can delete it or submit it again.",
     "save": "Save",
     "saved": "Saved",
     "exportProfile": "Export Current Profile",

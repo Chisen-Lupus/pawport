@@ -249,8 +249,20 @@
           <article v-for="uc in userCons" :key="uc.id" class="my-con-item">
             <div class="my-con-main">
               <div class="my-con-info">
-                <strong>{{ uc.Con?.name || 'Unknown' }}</strong>
+                <div class="my-con-title">
+                  <strong>{{ uc.Con?.name || 'Unknown' }}</strong>
+                  <span
+                    v-if="shouldShowConStatus(uc)"
+                    class="con-status-badge"
+                    :class="`status-${conStatus(uc)}`"
+                  >
+                    {{ conStatusLabel(uc) }}
+                  </span>
+                </div>
                 <span class="con-date">{{ uc.Con?.start_date }}</span>
+                <span v-if="conStatusHint(uc)" class="con-status-hint">
+                  {{ conStatusHint(uc) }}
+                </span>
                 <span v-if="uc.comment" class="con-comment">{{ uc.comment }}</span>
                 <span v-if="uc.Hotels?.length" class="con-hotels">
                   {{ $t('con.hotel') }}: {{ uc.Hotels.map(hotel => hotel.name).join(', ') }}
@@ -504,6 +516,8 @@ const passwordForm = reactive({
   confirm_password: '',
 })
 
+const REVIEW_STATUSES = new Set(['pending', 'approved', 'rejected'])
+
 async function saveProfile() {
   saving.value = true
   try {
@@ -659,6 +673,26 @@ function sortVisitsByConDateDesc(visits) {
     if (aTime !== bTime) return bTime - aTime
     return (b.visit_order || 0) - (a.visit_order || 0)
   })
+}
+
+function conStatus(visit) {
+  const status = visit.Con?.status
+  return REVIEW_STATUSES.has(status) ? status : 'approved'
+}
+
+function shouldShowConStatus(visit) {
+  return conStatus(visit) !== 'approved'
+}
+
+function conStatusLabel(visit) {
+  return t(`admin.status.${conStatus(visit)}`)
+}
+
+function conStatusHint(visit) {
+  const status = conStatus(visit)
+  if (status === 'pending') return t('user.pendingConHint')
+  if (status === 'rejected') return t('user.rejectedConHint')
+  return ''
 }
 
 async function searchCons() {
@@ -1010,6 +1044,7 @@ function buildExportPayload() {
         country: visit.Con?.country,
         latitude: visit.Con?.latitude,
         longitude: visit.Con?.longitude,
+        status: visit.Con?.status,
       },
       hotels: (visit.Hotels || []).map(hotel => ({
         name: hotel.name,
@@ -1476,14 +1511,43 @@ watch(() => form.show_on_homepage, value => {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
     
     strong { font-size: 0.9em; }
     .con-date { font-size: 0.8em; color: var(--text-secondary); }
     .con-comment,
-    .con-hotels {
+    .con-hotels,
+    .con-status-hint {
       color: var(--text-secondary);
       font-size: 0.8em;
       line-height: 1.35;
+    }
+  }
+
+  .my-con-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .con-status-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-full);
+    padding: 2px 7px;
+    font-size: 0.68em;
+    font-weight: 800;
+
+    &.status-pending {
+      background: color-mix(in srgb, #F59E0B 16%, transparent);
+      color: #D97706;
+    }
+
+    &.status-rejected {
+      background: color-mix(in srgb, #DC2626 14%, transparent);
+      color: #DC2626;
     }
   }
 
